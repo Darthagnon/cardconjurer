@@ -21,14 +21,40 @@ function setImageUrl(image, source) {
 	image.crossOrigin = 'anonymous';
 	image.src = fixUri(source);
 }
+
+const baseWidth = 1500;
+const baseHeight = 2100;
+const highResScale = 1.34;
+// function getStandardWidth() {
+// 	var value = baseWidth;
+// 	if (localStorage.getItem('high-res') == 'true') {
+// 		value *= highResScale;
+// 	}
+// 	return value;
+// }
+// function getStandardHeight() {
+// 	var value = baseHeight;
+// 	if (localStorage.getItem('high-res') == 'true') {
+// 		value *= highResScale;
+// 	}
+// 	return value;
+// }
+function getStandardWidth() {
+	return 2010;
+}
+function getStandardHeight() {
+	return 2814;
+}
+
 //card object
-var card = {width:1500, height:2100, marginX:0, marginY:0, frames:[], artSource:fixUri('/img/blank.png'), artX:0, artY:0, artZoom:1, artRotate:0, setSymbolSource:fixUri('/img/blank.png'), setSymbolX:0, setSymbolY:0, setSymbolZoom:1, watermarkSource:fixUri('/img/blank.png'), watermarkX:0, watermarkY:0, watermarkZoom:1, watermarkLeft:'none', watermarkRight:'none', watermarkOpacity:0.4, version:'', manaSymbols:[]};
+var card = {width:getStandardWidth(), height:getStandardHeight(), marginX:0, marginY:0, frames:[], artSource:fixUri('/img/blank.png'), artX:0, artY:0, artZoom:1, artRotate:0, setSymbolSource:fixUri('/img/blank.png'), setSymbolX:0, setSymbolY:0, setSymbolZoom:1, watermarkSource:fixUri('/img/blank.png'), watermarkX:0, watermarkY:0, watermarkZoom:1, watermarkLeft:'none', watermarkRight:'none', watermarkOpacity:0.4, version:'', manaSymbols:[]};
 //core images/masks
 const black = new Image(); black.crossOrigin = 'anonymous'; black.src = fixUri('/img/black.png');
 const blank = new Image(); blank.crossOrigin = 'anonymous'; blank.src = fixUri('/img/blank.png');
 const right = new Image(); right.crossOrigin = 'anonymous'; right.src = fixUri('/img/frames/maskRightHalf.png');
 const middle = new Image(); middle.crossOrigin = 'anonymous'; middle.src = fixUri('/img/frames/maskMiddleThird.png');
 const corner = new Image(); corner.crossOrigin = 'anonymous'; corner.src = fixUri('/img/frames/cornerCutout.png');
+const serial = new Image(); serial.crossOrigin = 'anonymous'; serial.src = fixUri('/img/frames/serial.png');
 //art
 art = new Image(); art.crossOrigin = 'anonymous'; art.src = blank.src;
 art.onerror = function() {if (!this.src.includes('/img/blank.png')) {this.src = fixUri('/img/blank.png');}}
@@ -67,6 +93,7 @@ var scryfallCard;
 var drawTextBetweenFrames = false;
 var redrawFrames = false;
 var savedTextXPosition = 0;
+var savedTextXPosition2 = 0;
 var savedRollYPosition = null;
 var savedFont = null;
 var savedTextContents = {};
@@ -75,11 +102,16 @@ var date = new Date();
 card.infoYear = date.getFullYear();
 document.querySelector("#info-year").value = card.infoYear;
 //to avoid rerunning special scripts (planeswalker, saga, etc...)
+
 var loadedVersions = [];
 //Card Object managament
-async function resetCardIrregularities({canvas = [1500, 2100, 0, 0], resetOthers = true} = {}) {
+async function resetCardIrregularities({canvas = [getStandardWidth(), getStandardHeight(), 0, 0], resetOthers = true} = {}) {
 	//misc details
 	card.margins = false;
+	card.bottomInfoTranslate = {x:0, y:0};
+	card.bottomInfoRotate = 0;
+	card.bottomInfoZoom = 1;
+	card.bottomInfoColor = 'white';
 	replacementMasks = {};
 	//rotation
 	if (card.landscape) {
@@ -101,17 +133,35 @@ async function resetCardIrregularities({canvas = [1500, 2100, 0, 0], resetOthers
 		}
 	});
 	if (resetOthers) {
-		//bottom info
-		await loadBottomInfo({
-			midLeft: {text:'{elemidinfo-set}*{elemidinfo-language}  {savex}{fontbelerenbsc}{fontsize' + scaleHeight(0.001) + '}{upinline' + scaleHeight(0.0005) + '}\uFFEE{elemidinfo-artist}', x:0.0647, y:0.9548, width:0.8707, height:0.0171, oneLine:true, font:'gothammedium', size:0.0171, color:'white', outlineWidth:0.003},
-			topLeft: {text:'{elemidinfo-number}  {loadx}{elemidinfo-rarity}', x:0.0647, y:0.9377, width:0.8707, height:0.0171, oneLine:true, font:'gothammedium', size:0.0171, color:'white', outlineWidth:0.003},
-			bottomLeft: {text:'NOT FOR SALE', x:0.0647, y:0.9719, width:0.8707, height:0.0143, oneLine:true, font:'gothammedium', size:0.0143, color:'white', outlineWidth:0.003},
-			wizards: {name:'wizards', text:'{ptshift0,0.0172}\u2122 & \u00a9 {elemidinfo-year} Wizards of the Coast', x:0.0647, y:0.9377, width:0.8707, height:0.0167, oneLine:true, font:'mplantin', size:0.0162, color:'white', align:'right', outlineWidth:0.003},
-			bottomRight: {text:'{ptshift0,0.0172}CardConjurer.com', x:0.0647, y:0.9548, width:0.8707, height:0.0143, oneLine:true, font:'mplantin', size:0.0143, color:'white', align:'right', outlineWidth:0.003}
-		});
+		setBottomInfoStyle();		
 		//onload
 		card.onload = null;
+		
+		card.hideBottomInfoBorder = false;
+		card.showsFlavorBar = true;
 	}
+}
+async function setBottomInfoStyle() {
+	if (document.querySelector('#enableNewCollectorStyle').checked) {
+			await loadBottomInfo({
+				midLeft: {text:'{elemidinfo-set} \u2022 {elemidinfo-language}  {savex}{fontbelerenbsc}{fontsize' + scaleHeight(0.001) + '}{upinline' + scaleHeight(0.0005) + '}\uFFEE{savex2}{elemidinfo-artist}', x:0.0647, y:0.9548, width:0.8707, height:0.0171, oneLine:true, font:'gothammedium', size:0.0171, color:card.bottomInfoColor, outlineWidth:0.003},
+				topLeft: {text:'{elemidinfo-rarity} {kerning3}{elemidinfo-number}{kerning0}', x:0.0647, y:0.9377, width:0.8707, height:0.0171, oneLine:true, font:'gothammedium', size:0.0171, color:card.bottomInfoColor, outlineWidth:0.003},
+				note: {text:'{loadx}{elemidinfo-note}', x:0.0647, y:0.9377, width:0.8707, height:0.0171, oneLine:true, font:'gothammedium', size:0.0171, color:card.bottomInfoColor, outlineWidth:0.003},
+				bottomLeft: {text:'NOT FOR SALE', x:0.0647, y:0.9719, width:0.8707, height:0.0143, oneLine:true, font:'gothammedium', size:0.0143, color:card.bottomInfoColor, outlineWidth:0.003},
+				wizards: {name:'wizards', text:'{ptshift0,0.0172}\u2122 & \u00a9 {elemidinfo-year} Wizards of the Coast', x:0.0647, y:0.9377, width:0.8707, height:0.0167, oneLine:true, font:'mplantin', size:0.0162, color:card.bottomInfoColor, align:'right', outlineWidth:0.003},
+				bottomRight: {text:'{ptshift0,0.0172}CardConjurer.com', x:0.0647, y:0.9548, width:0.8707, height:0.0143, oneLine:true, font:'mplantin', size:0.0143, color:card.bottomInfoColor, align:'right', outlineWidth:0.003}
+			});
+		} else {
+			await loadBottomInfo({
+				midLeft: {text:'{elemidinfo-set} \u2022 {elemidinfo-language}  {savex}{fontbelerenbsc}{fontsize' + scaleHeight(0.001) + '}{upinline' + scaleHeight(0.0005) + '}\uFFEE{savex2}{elemidinfo-artist}', x:0.0647, y:0.9548, width:0.8707, height:0.0171, oneLine:true, font:'gothammedium', size:0.0171, color: card.bottomInfoColor, outlineWidth:0.003},
+				topLeft: {text:'{elemidinfo-number}', x:0.0647, y:0.9377, width:0.8707, height:0.0171, oneLine:true, font:'gothammedium', size:0.0171, color:card.bottomInfoColor, outlineWidth:0.003},
+				note: {text:'{loadx2}{elemidinfo-note}', x:0.0647, y:0.9377, width:0.8707, height:0.0171, oneLine:true, font:'gothammedium', size:0.0171, color:card.bottomInfoColor, outlineWidth:0.003},
+				rarity: {text:'{loadx}{elemidinfo-rarity}', x:0.0647, y:0.9377, width:0.8707, height:0.0171, oneLine:true, font:'gothammedium', size:0.0171, color:card.bottomInfoColor, outlineWidth:0.003},
+				bottomLeft: {text:'NOT FOR SALE', x:0.0647, y:0.9719, width:0.8707, height:0.0143, oneLine:true, font:'gothammedium', size:0.0143, color:card.bottomInfoColor, outlineWidth:0.003},
+				wizards: {name:'wizards', text:'{ptshift0,0.0172}\u2122 & \u00a9 {elemidinfo-year} Wizards of the Coast', x:0.0647, y:0.9377, width:0.8707, height:0.0167, oneLine:true, font:'mplantin', size:0.0162, color:card.bottomInfoColor, align:'right', outlineWidth:0.003},
+				bottomRight: {text:'{ptshift0,0.0172}CardConjurer.com', x:0.0647, y:0.9548, width:0.8707, height:0.0143, oneLine:true, font:'mplantin', size:0.0143, color:card.bottomInfoColor, align:'right', outlineWidth:0.003}
+			});
+		}
 }
 //Canvas management
 function sizeCanvas(name, width = Math.round(card.width * (1 + 2 * card.marginX)), height = Math.round(card.height * (1 + 2 * card.marginY))) {
@@ -167,6 +217,16 @@ function getCardName() {
 	var imageName = card.text.title.text || 'unnamed';
 	if (card.text.nickname) {
 		imageName += ' (' + card.text.nickname.text + ')';
+	}
+	return imageName.replace(/\{[^}]+\}/g, '');
+}
+function getInlineCardName() {
+	if (card.text == undefined || card.text.title == undefined) {
+		return 'unnamed';
+	}
+	var imageName = card.text.title.text || 'unnamed';
+	if (card.text.nickname) {
+		imageName = card.text.nickname.text;
 	}
 	return imageName.replace(/\{[^}]+\}/g, '');
 }
@@ -262,16 +322,24 @@ const setSymbolAliases = new Map([
 const mana = new Map();
 // var manaSymbols = [];
 loadManaSymbols(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
-				 'w', 'u', 'b', 'r', 'g', 'c', 'x', 'y', 'z', 't', 'untap', 'e', 's', 'oldtap', 'originaltap', 'purple', "a", "inf"]);
+				 'w', 'u', 'b', 'r', 'g', 'c', 'x', 'y', 'z', 't', 'untap', 's', 'oldtap', 'originaltap', 'purple', "inf", "alchemy"]);
+loadManaSymbols(true, ['e', 'a']);
 loadManaSymbols(['wu', 'wb', 'ub', 'ur', 'br', 'bg', 'rg', 'rw', 'gw', 'gu', '2w', '2u', '2b', '2r', '2g', 'wp', 'up', 'bp', 'rp', 'gp', 'p',
-				 'wup', 'wbp', 'ubp', 'urp', 'brp', 'bgp', 'rgp', 'rwp', 'gwp', 'gup', 'purplew', 'purpleu', 'purpleb', 'purpler', 'purpleg', 
-				 '2purple', 'purplep'], [1.2, 1.2]);
+				 'wup', 'wbp', 'ubp', 'urp', 'brp', 'bgp', 'rgp', 'rwp', 'gwp', 'gup', 'purplew', 'purpleu', 'purpleb', 'purpler', 'purpleg',
+				 '2purple', 'purplep', 'cw', 'cu', 'cb', 'cr', 'cg'], [1.2, 1.2]);
 loadManaSymbols(['bar.png', 'whitebar.png']);
-loadManaSymbols(['chaos'], [1.2, 1]);
-loadManaSymbols(['tk'], [0.8, 1]);
-loadManaSymbols(['planeswalker'], [0.6, 1.2]);
-loadManaSymbols(['+1', '+2', '+3', '+4', '+5', '+6', '+7', '+8', '+9', '-1', '-2', '-3', '-4', '-5', '-6', '-7', '-8', '-9', '+0'], [1.6, 1]);
-function loadManaSymbols(manaSymbolPaths, size = [1, 1]) {
+loadManaSymbols(true, ['chaos'], [1.2, 1]);
+loadManaSymbols(true, ['tk'], [0.8, 1]);
+loadManaSymbols(true, ['planeswalker'], [0.6, 1.2]);
+loadManaSymbols(true, ['+1', '+2', '+3', '+4', '+5', '+6', '+7', '+8', '+9', '-1', '-2', '-3', '-4', '-5', '-6', '-7', '-8', '-9', '+0'], [1.6, 1]);
+function loadManaSymbols(matchColor, manaSymbolPaths, size = [1, 1]) {
+	if (typeof matchColor === 'object') {
+		// Hacky way to add a default argument for matchColor without breaking the function call from other places
+		size = manaSymbolPaths || [1,1];
+		manaSymbolPaths = matchColor;
+		matchColor = false;
+	}
+
 	manaSymbolPaths.forEach(item => {
 		var manaSymbol = {};
 		if (typeof item == 'string') {
@@ -292,6 +360,9 @@ function loadManaSymbols(manaSymbolPaths, size = [1, 1]) {
 				loadManaSymbols([manaSymbol.path.replace(manaSymbol.name, 'back' + i + item[1])])
 			}
 		}
+
+		manaSymbol.matchColor = matchColor;
+
 		manaSymbol.width = size[0];
 		manaSymbol.height = size[1];
 		manaSymbol.image = new Image();
@@ -502,6 +573,2422 @@ function doubleClick(event, maskOrFrame) {
 		return document.querySelector(buttonID);
 	}
 	return null;
+}
+function cardFrameProperties(colors, manaCost, typeLine, power, style) {
+	var colors = colors.map(color => color.toUpperCase())
+	if ([
+			['U', 'W'],
+			['B', 'W'],
+			['R', 'B'],
+			['G', 'B'],
+			['B', 'U'],
+			['R', 'U'],
+			['G', 'R'],
+			['W', 'R'],
+			['W', 'G'],
+			['U', 'G']
+		].map(arr => JSON.stringify(arr) === JSON.stringify(colors)).includes(true)) {
+		colors.reverse();
+	}
+
+	var isHybrid = manaCost.includes('/');
+
+	var rules;
+	if (style == 'Seventh') {
+		if (typeLine.includes('Land')) {
+			if (colors.length == 0 || colors.length > 2) {
+				rules = 'L';
+			} else {
+				rules = colors[0] + 'L';
+			}
+		} else {
+			if (colors.length == 1) {
+				rules = colors[0];
+			} else if (colors.length >=2) {
+				rules = 'M';
+			} else if (typeLine.includes("Artifact")) {
+				rules = 'A';
+			} else {
+				rules = 'C';
+			}
+		}
+
+	} else {
+		if (typeLine.includes('Land')) {
+			if (colors.length == 0) {
+				rules = 'L';
+			} else if (colors.length > 2) {
+				rules = 'ML';
+			} else {
+				rules = colors[0] + 'L';
+			}
+		} else if (colors.length > 2) {
+			if (style == 'Etched' && typeLine.includes('Artifact')) {
+				rules = 'A';
+			} else {
+				rules = 'M';
+			}
+		} else if (colors.length != 0) {
+			rules = colors[0];
+		} else if (style == 'Borderless' && !typeLine.includes('Artifact')) {
+			rules = 'C';
+		} else {
+			rules = 'A';
+		}
+	}
+
+	var rulesRight;
+	if (colors.length == 2) {
+		if (typeLine.includes('Land')) {
+			rulesRight = colors[1] + 'L';
+		} else if (style != 'Seventh') {
+			rulesRight = colors[1];
+		}
+	}
+
+	var pinline = rules;
+	var pinlineRight = rulesRight;
+
+	if (style == 'Seventh' && typeLine.includes('Land') && colors.length >= 2) {
+		pinline = 'L';
+		pinlineRight = null;
+	}
+
+	var typeTitle;
+	if (colors.length >= 2) {
+		if (isHybrid || typeLine.includes('Land')) {
+			if (colors.length >= 3) {
+				typeTitle = 'M';
+			} else {
+				typeTitle = 'L';
+			}
+		} else {
+			typeTitle = 'M';
+		}
+	} else if (typeLine.includes('Land')) {
+		if (colors.length == 0) {
+			typeTitle = 'L';
+		} else if (style == 'Etched') {
+			if (colors.length > 2) {
+				typeTitle = 'M';
+			} else if (colors.length == 1) {
+				typeTitle = colors[0];
+			} else {
+				typeTitle = 'L';
+			}
+		} else {
+			typeTitle = colors[0] + 'L';
+		}
+	} else if (colors.length == 1) {
+		typeTitle = colors[0];
+	} else if (style == 'Borderless' && !typeLine.includes('Artifact')) {
+		typeTitle = 'C';
+	} else {
+		typeTitle = 'A';
+	}
+
+	var pt;
+	if (power) {
+		if (typeLine.includes('Vehicle')) {
+			pt = 'V';
+		} else if (typeTitle == 'L') {
+			pt = 'C';
+		} else {
+			pt = typeTitle;
+		}
+	}
+
+	var frame;
+	if (style == 'Seventh') {
+		if (typeLine.includes('Land')) {
+			frame = 'L'
+		} else {
+			frame = pinline;
+		}
+	} else if (typeLine.includes('Land')) {
+		if (style == 'Etched') {
+			if (colors.length > 2) {
+				frame = 'M';
+			} else if (colors.length > 0) {
+				frame = colors[0];
+			} else {
+				frame = 'L';
+			}
+		} else {
+			frame = 'L';
+		}
+	} else if (typeLine.includes('Vehicle')) {
+		frame = 'V';
+	} else if (typeLine.includes('Artifact')) {
+		frame = 'A';
+	} else if (colors.length > 2) {
+		frame = 'M';
+	} else if (colors.length == 2) {
+		if (isHybrid || style == 'Etched') {
+			frame = colors[0];
+		} else {
+			frame = 'M';
+		}
+	} else if (colors.length == 1) {
+		frame = colors[0];
+	} else {
+		frame = 'L';
+	}
+
+	var frameRight;
+	if (!(typeLine.includes('Vehicle') || typeLine.includes('Artifact'))) {
+		if (colors.length == 2 && (isHybrid || style == 'Etched')) {
+			frameRight = colors[1];
+		}
+	}
+
+	return {
+		'pinline': pinline,
+		'pinlineRight': pinlineRight,
+		'rules': rules,
+		'rulesRight': rulesRight,
+		'typeTitle': typeTitle,
+		'pt': pt,
+		'frame': frame,
+		'frameRight': frameRight
+	}
+}
+var autoFramePack;
+function autoFrame() {
+	var frame = document.querySelector('#autoFrame').value;
+	if (frame == 'false') { autoFramePack = null; return; }
+
+	var colors = [];
+	if (card.text.type.text.toLowerCase().includes('land')) {
+		var rules = card.text.rules.text;
+		var flavorIndex = rules.indexOf('{flavor}');
+		if (flavorIndex == -1) {
+			flavorIndex = rules.indexOf('{oldflavor}');
+		}
+		if (flavorIndex != -1) {
+			rules = rules.substring(0, flavorIndex);
+		}
+
+		var lines = rules.split('\n');
+
+		lines.forEach(function(line) {
+			var addIndex = line.indexOf('Add');
+			var length = 3;
+			if (addIndex == -1) {
+				addIndex = line.toLowerCase().indexOf(' add');
+				length = 4;
+			}
+			if (addIndex != -1) {
+				var upToAdd = line.substring(addIndex+length).toLowerCase();
+              	['W', 'U', 'B', 'R', 'G'].forEach(function (color) {
+					if (upToAdd.includes('{' + color.toLowerCase() + '}')) {
+                  		colors.push(color);
+                	}
+                });
+			}
+		});
+
+		if (!colors.includes('W') && (rules.toLowerCase().includes('plains') || card.text.type.text.toLowerCase().includes('plains'))) {
+			colors.push('W');
+		}
+		if (!colors.includes('U') && (rules.toLowerCase().includes('island') || card.text.type.text.toLowerCase().includes('island'))) {
+			colors.push('U');
+		}
+		if (!colors.includes('B') && (rules.toLowerCase().includes('swamp') || card.text.type.text.toLowerCase().includes('swamp'))) {
+			colors.push('B');
+		}
+		if (!colors.includes('R') && (rules.toLowerCase().includes('mountain') || card.text.type.text.toLowerCase().includes('mountain'))) {
+			colors.push('R');
+		}
+		if (!colors.includes('G') && (rules.toLowerCase().includes('forest') || card.text.type.text.toLowerCase().includes('forest'))) {
+			colors.push('G');
+		}
+
+		if (rules.toLowerCase().includes('search') && colors.length == 0) {
+			// TODO: This doesn't match Bog Wreckage
+			if (rules.includes('into your hand') || (rules.includes('tapped') && !(rules.toLowerCase().includes('enters the battlefield tapped')) && !(rules.toLowerCase().includes('untap')))) {
+				colors = [];
+			} else if (colors.length == 0) {
+				colors = ['W', 'U', 'B', 'R', 'G'];
+			}
+		}
+
+		if (rules.includes('any color') || rules.includes('any one color') || rules.includes('choose a color') || rules.includes('any combination of colors')) {
+			colors = ['W', 'U', 'B', 'R', 'G'];
+		}
+
+
+	} else {
+		colors = [...new Set(card.text.mana.text.toUpperCase().split('').filter(char => ['W', 'U', 'B', 'R', 'G'].includes(char)))];
+	}
+
+	var group;
+	if (frame == 'M15Regular-1') {
+		autoM15Frame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text);
+		group = 'Standard-3';
+	} else if (frame == 'M15RegularNew') {
+		autoM15NewFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text);
+		group = 'Accurate';
+	} else if (frame == 'M15Eighth') {
+		autoM15EighthFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text);
+		group = 'Custom';
+	} else if (frame == 'M15EighthUB') {
+		autoM15EighthUBFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text);
+		group = 'Custom';
+	} else if (frame == 'UB') {
+		autoUBFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text);
+		group = 'Showcase-5';
+	} else if (frame == 'UBNew') {
+		autoUBNewFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text);
+		group = 'Accurate';
+	} else if (frame == 'FullArtNew') {
+		autoFullArtNewFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text);
+		group = 'Accurate';
+	} else if (frame == 'Circuit') {
+		autoCircuitFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text);
+		group = 'Custom';
+	} else if (frame == 'Etched') {
+		group = 'Showcase-5';
+		autoEtchedFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text);
+	} else if (frame == 'Praetors') {
+		group = 'Showcase-5';
+		autoPhyrexianFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text);
+	} else if (frame == 'Seventh') {
+		group = 'Misc-2';
+		autoSeventhEditionFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text);
+	} else if (frame == 'M15BoxTopper') {
+		group = 'Showcase-5';
+		autoExtendedArtFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text, false);
+	} else if (frame == 'M15ExtendedArtShort') {
+		group = 'Showcase-5';
+		autoExtendedArtFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text, true);
+	} else if (frame == '8th') {
+		group = 'Misc-2';
+		auto8thEditionFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text, false);
+	} else if (frame == 'Borderless') {
+		group = 'Showcase-5';
+		autoBorderlessFrame(colors, card.text.mana.text, card.text.type.text, card.text.pt.text);
+	}
+
+	if (autoFramePack != frame) {
+		loadScript('/js/frames/pack' + frame + '.js');
+		autoFramePack = frame;
+	}
+}
+async function autoUBFrame(colors, mana_cost, type_line, power) {
+	var frames = card.frames.filter(frame => frame.name.includes('Extension') || frame.name.includes('Gray Holo Stamp') || frame.name.includes('Gold Holo Stamp'));
+
+	//clear the draggable frames
+	card.frames = [];
+	document.querySelector('#frame-list').innerHTML = null;
+
+	var properties = cardFrameProperties(colors, mana_cost, type_line, power);
+
+	// Set frames
+
+	if (type_line.toLowerCase().includes('legendary')) {
+		if (properties.pinlineRight) {
+			frames.push(makeUBFrameByLetter(properties.pinlineRight, 'Crown', true));
+		}
+		frames.push(makeUBFrameByLetter(properties.pinline, "Crown", false));
+		frames.push(makeUBFrameByLetter(properties.pinline, "Crown Border Cover", false));
+	}
+	if (properties.pinlineRight) {
+		frames.push(makeUBFrameByLetter(properties.pinlineRight, 'Stamp', true));
+	}
+	frames.push(makeUBFrameByLetter(properties.pinline, "Stamp", false));
+	if (properties.pt) {
+		frames.push(makeUBFrameByLetter(properties.pt, 'PT', false));
+	}
+	if (properties.pinlineRight) {
+		frames.push(makeUBFrameByLetter(properties.pinlineRight, 'Pinline', true));
+	}
+	frames.push(makeUBFrameByLetter(properties.pinline, 'Pinline', false));
+	frames.push(makeUBFrameByLetter(properties.typeTitle, 'Type', false));
+	frames.push(makeUBFrameByLetter(properties.typeTitle, 'Title', false));
+	if (properties.pinlineRight) {
+		frames.push(makeUBFrameByLetter(properties.rulesRight, 'Rules', true));
+	}
+	frames.push(makeUBFrameByLetter(properties.rules, 'Rules', false));
+	if (properties.frameRight) {
+		frames.push(makeUBFrameByLetter(properties.frameRight, 'Frame', true));
+	}
+	frames.push(makeUBFrameByLetter(properties.frame, 'Frame', false));
+	frames.push(makeUBFrameByLetter(properties.frame, 'Border', false));
+
+	if (card.text.pt && type_line.includes('Vehicle') && !card.text.pt.text.includes('fff')) {
+		card.text.pt.text = '{fontcolor#fff}' + card.text.pt.text;
+	}
+
+	card.frames = frames;
+	card.frames.reverse();
+	await card.frames.forEach(item => addFrame([], item));
+	card.frames.reverse();
+}
+async function autoUBNewFrame(colors, mana_cost, type_line, power) {
+	autoM15NewFrame(colors, mana_cost, type_line, power, 'ub');
+}
+async function autoFullArtNewFrame(colors, mana_cost, type_line, power) {
+	autoM15NewFrame(colors, mana_cost, type_line, power, 'fullart');
+}
+async function autoCircuitFrame(colors, mana_cost, type_line, power) {
+	var frames = card.frames.filter(frame => frame.name.includes('Extension') || frame.name.includes('Gray Holo Stamp') || frame.name.includes('Gold Holo Stamp'));
+
+	//clear the draggable frames
+	card.frames = [];
+	document.querySelector('#frame-list').innerHTML = null;
+
+	var properties = cardFrameProperties(colors, mana_cost, type_line, power);
+
+	// Set frames
+
+	if (type_line.toLowerCase().includes('legendary')) {
+		if (properties.pinlineRight) {
+			frames.push(makeCircuitFrameByLetter(properties.pinlineRight, 'Crown', true));
+		}
+		frames.push(makeCircuitFrameByLetter(properties.pinline, "Crown", false));
+		frames.push(makeCircuitFrameByLetter(properties.pinline, "Crown Border Cover", false));
+	}
+	if (properties.pt) {
+		frames.push(makeCircuitFrameByLetter(properties.pt, 'PT', false));
+	}
+	if (properties.pinlineRight) {
+		frames.push(makeCircuitFrameByLetter(properties.pinlineRight, 'Pinline', true));
+	}
+	frames.push(makeCircuitFrameByLetter(properties.pinline, 'Pinline', false));
+	frames.push(makeCircuitFrameByLetter(properties.typeTitle, 'Type', false));
+	frames.push(makeCircuitFrameByLetter(properties.typeTitle, 'Title', false));
+	if (properties.pinlineRight) {
+		frames.push(makeCircuitFrameByLetter(properties.rulesRight, 'Rules', true));
+	}
+	frames.push(makeCircuitFrameByLetter(properties.rules, 'Rules', false));
+	if (properties.frameRight) {
+		frames.push(makeCircuitFrameByLetter(properties.frameRight, 'Frame', true));
+	}
+	frames.push(makeCircuitFrameByLetter(properties.frame, 'Frame', false));
+	frames.push(makeCircuitFrameByLetter(properties.frame, 'Border', false));
+
+	if (card.text.pt && type_line.includes('Vehicle') && !card.text.pt.text.includes('fff')) {
+		card.text.pt.text = '{fontcolor#fff}' + card.text.pt.text;
+	}
+
+	card.frames = frames;
+	card.frames.reverse();
+	await card.frames.forEach(item => addFrame([], item));
+	card.frames.reverse();
+}
+async function autoM15Frame(colors, mana_cost, type_line, power) {
+	var frames = card.frames.filter(frame => frame.name.includes('Extension'));
+
+	//clear the draggable frames
+	card.frames = [];
+	document.querySelector('#frame-list').innerHTML = null;
+
+	var properties = cardFrameProperties(colors, mana_cost, type_line, power);
+	var style = 'regular';
+	if (type_line.toLowerCase().includes('snow')) {
+		style = 'snow';
+	} else if (type_line.toLowerCase().includes('enchantment creature') || type_line.toLowerCase().includes('enchantment artifact')) {
+		style = 'Nyx';
+	}
+
+	// Set frames
+	if (type_line.includes('Legendary')) {
+		if (style == 'Nyx') {
+			if (properties.pinlineRight) {
+				frames.push(makeM15FrameByLetter(properties.pinlineRight, 'Inner Crown', true, style));
+			}
+			frames.push(makeM15FrameByLetter(properties.pinline, 'Inner Crown', false, style));
+		}
+
+		if (properties.pinlineRight) {
+			frames.push(makeM15FrameByLetter(properties.pinlineRight, 'Crown', true, style));
+		}
+		frames.push(makeM15FrameByLetter(properties.pinline, "Crown", false, style));
+		frames.push(makeM15FrameByLetter(properties.pinline, "Crown Border Cover", false, style));
+	}
+	if (properties.pt) {
+		frames.push(makeM15FrameByLetter(properties.pt, 'PT', false, style));
+	}
+	if (properties.pinlineRight) {
+		frames.push(makeM15FrameByLetter(properties.pinlineRight, 'Pinline', true, style));
+	}
+	frames.push(makeM15FrameByLetter(properties.pinline, 'Pinline', false, style));
+	frames.push(makeM15FrameByLetter(properties.typeTitle, 'Type', false, style));
+	frames.push(makeM15FrameByLetter(properties.typeTitle, 'Title', false, style));
+	if (properties.pinlineRight) {
+		frames.push(makeM15FrameByLetter(properties.rulesRight, 'Rules', true, style));
+	}
+	frames.push(makeM15FrameByLetter(properties.rules, 'Rules', false, style));
+	if (properties.frameRight) {
+		frames.push(makeM15FrameByLetter(properties.frameRight, 'Frame', true, style));
+	}
+	frames.push(makeM15FrameByLetter(properties.frame, 'Frame', false, style));
+	frames.push(makeM15FrameByLetter(properties.frame, 'Border', false, style));
+
+	if (card.text.pt && type_line.includes('Vehicle') && !card.text.pt.text.includes('fff')) {
+		card.text.pt.text = '{fontcolor#fff}' + card.text.pt.text;
+	}
+
+	card.frames = frames;
+	card.frames.reverse();
+	await card.frames.forEach(item => addFrame([], item));
+	card.frames.reverse();
+}
+async function autoM15NewFrame(colors, mana_cost, type_line, power, style = 'regular') {
+	var frames;
+	if (style == 'ub') {
+		frames = card.frames.filter(frame => frame.name.includes('Extension') || frame.name.includes('Gray Holo Stamp'));
+	} else {
+		frames = card.frames.filter(frame => frame.name.includes('Extension'));
+	}
+
+	//clear the draggable frames
+	card.frames = [];
+	document.querySelector('#frame-list').innerHTML = null;
+
+	var properties = cardFrameProperties(colors, mana_cost, type_line, power);
+	if (style != 'ub' && style != 'fullart') {
+	 	if (type_line.toLowerCase().includes('snow')) {
+			style = 'snow';
+		} else if (type_line.toLowerCase().includes('enchantment creature') || type_line.toLowerCase().includes('enchantment artifact')) {
+			style = 'Nyx';
+		}
+	}
+
+	// Set frames
+	if (type_line.includes('Legendary')) {
+		if (style == 'Nyx') {
+			if (properties.pinlineRight) {
+				frames.push(makeM15NewFrameByLetter(properties.pinlineRight, 'Inner Crown', true, style));
+			}
+
+			frames.push(makeM15NewFrameByLetter(properties.pinline, 'Inner Crown', false, style));			
+		}
+
+		if (properties.pinlineRight) {
+			frames.push(makeM15NewFrameByLetter(properties.pinlineRight, 'Crown', true, style));
+		}
+		frames.push(makeM15NewFrameByLetter(properties.pinline, "Crown", false, style));
+		frames.push(makeM15NewFrameByLetter(properties.pinline, "Crown Border Cover", false, style));
+	}
+
+	if (style == 'ub') {
+		if (properties.pinlineRight) {
+			frames.push(makeM15NewFrameByLetter(properties.pinlineRight, 'Stamp', true, style));
+		}
+		frames.push(makeM15NewFrameByLetter(properties.pinline, "Stamp", false, style));
+	}
+
+	if (properties.pt) {
+		frames.push(makeM15NewFrameByLetter(properties.pt, 'PT', false, style));
+	}
+	if (properties.pinlineRight) {
+		frames.push(makeM15NewFrameByLetter(properties.pinlineRight, 'Pinline', true, style));
+	}
+	frames.push(makeM15NewFrameByLetter(properties.pinline, 'Pinline', false, style));
+	frames.push(makeM15NewFrameByLetter(properties.typeTitle, 'Type', false, style));
+	frames.push(makeM15NewFrameByLetter(properties.typeTitle, 'Title', false, style));
+	if (properties.pinlineRight) {
+		frames.push(makeM15NewFrameByLetter(properties.rulesRight, 'Rules', true, style));
+	}
+	frames.push(makeM15NewFrameByLetter(properties.rules, 'Rules', false, style));
+	if (properties.frameRight) {
+		frames.push(makeM15NewFrameByLetter(properties.frameRight, 'Frame', true, style));
+	}
+	frames.push(makeM15NewFrameByLetter(properties.frame, 'Frame', false, style));
+	frames.push(makeM15NewFrameByLetter(properties.frame, 'Border', false, style));
+
+	if (card.text.pt && type_line.includes('Vehicle') && !card.text.pt.text.includes('fff')) {
+		card.text.pt.text = '{fontcolor#fff}' + card.text.pt.text;
+	}
+
+	card.frames = frames;
+	card.frames.reverse();
+	await card.frames.forEach(item => addFrame([], item));
+	card.frames.reverse();
+}
+async function autoM15EighthFrame(colors, mana_cost, type_line, power) {
+	var frames = card.frames.filter(frame => frame.name.includes('Extension'));
+
+	//clear the draggable frames
+	card.frames = [];
+	document.querySelector('#frame-list').innerHTML = null;
+
+	var properties = cardFrameProperties(colors, mana_cost, type_line, power);
+	var style = 'regular';
+	if (type_line.toLowerCase().includes('snow')) {
+		style = 'snow';
+	} else if (type_line.toLowerCase().includes('enchantment creature') || type_line.toLowerCase().includes('enchantment artifact')) {
+		style = 'Nyx';
+	}
+
+	// Set frames
+	if (type_line.includes('Legendary')) {
+		if (style == 'Nyx') {
+			if (properties.pinlineRight) {
+				frames.push(makeM15FrameByLetter(properties.pinlineRight, 'Inner Crown', true, style));
+			}
+			frames.push(makeM15FrameByLetter(properties.pinline, 'Inner Crown', false, style));
+		}
+
+		if (properties.pinlineRight) {
+			frames.push(makeM15FrameByLetter(properties.pinlineRight, 'Crown', true, style));
+		}
+		frames.push(makeM15FrameByLetter(properties.pinline, "Crown", false, style));
+		frames.push(makeM15FrameByLetter(properties.pinline, "Crown Border Cover", false, style));
+	}
+	if (properties.pt) {
+		frames.push(makeM15EighthFrameByLetter(properties.pt, 'PT', false, style));
+	}
+	if (properties.pinlineRight) {
+		frames.push(makeM15EighthFrameByLetter(properties.pinlineRight, 'Pinline', true, style));
+	}
+	frames.push(makeM15EighthFrameByLetter(properties.pinline, 'Pinline', false, style));
+	frames.push(makeM15EighthFrameByLetter(properties.typeTitle, 'Type', false, style));
+	frames.push(makeM15EighthFrameByLetter(properties.typeTitle, 'Title', false, style));
+	if (properties.pinlineRight) {
+		frames.push(makeM15EighthFrameByLetter(properties.rulesRight, 'Rules', true, style));
+	}
+	frames.push(makeM15EighthFrameByLetter(properties.rules, 'Rules', false, style));
+	if (properties.frameRight) {
+		frames.push(makeM15EighthFrameByLetter(properties.frameRight, 'Frame', true, style));
+	}
+	frames.push(makeM15EighthFrameByLetter(properties.frame, 'Frame', false, style));
+	frames.push(makeM15EighthFrameByLetter(properties.frame, 'Border', false, style));
+
+	if (card.text.pt && type_line.includes('Vehicle') && !card.text.pt.text.includes('fff')) {
+		card.text.pt.text = '{fontcolor#fff}' + card.text.pt.text;
+	}
+
+	card.frames = frames;
+	card.frames.reverse();
+	await card.frames.forEach(item => addFrame([], item));
+	card.frames.reverse();
+}
+async function autoM15EighthUBFrame(colors, mana_cost, type_line, power) {
+	var frames = card.frames.filter(frame => frame.name.includes('Extension'));
+
+	//clear the draggable frames
+	card.frames = [];
+	document.querySelector('#frame-list').innerHTML = null;
+
+	var properties = cardFrameProperties(colors, mana_cost, type_line, power);
+	var style = 'regular';
+	if (type_line.toLowerCase().includes('snow')) {
+		style = 'snow';
+	} else if (type_line.toLowerCase().includes('enchantment creature') || type_line.toLowerCase().includes('enchantment artifact')) {
+		style = 'Nyx';
+	}
+
+	// Set frames
+	if (type_line.includes('Legendary')) {
+		if (style == 'Nyx') {
+			if (properties.pinlineRight) {
+				frames.push(makeM15EighthUBFrameByLetter(properties.pinlineRight, 'Inner Crown', true, style));
+			}
+			frames.push(makeM15FrameByLetter(properties.pinline, 'Inner Crown', false, style));
+		}
+
+		if (properties.pinlineRight) {
+			frames.push(makeM15EighthUBFrameByLetter(properties.pinlineRight, 'Crown', true, style));
+		}
+		frames.push(makeM15EighthUBFrameByLetter(properties.pinline, "Crown", false, style));
+		frames.push(makeM15EighthUBFrameByLetter(properties.pinline, "Crown Border Cover", false, style));
+	}
+	if (properties.pt) {
+		frames.push(makeM15EighthUBFrameByLetter(properties.pt, 'PT', false, style));
+	}
+	if (properties.pinlineRight) {
+		frames.push(makeM15EighthUBFrameByLetter(properties.pinlineRight, 'Pinline', true, style));
+	}
+	frames.push(makeM15EighthUBFrameByLetter(properties.pinline, 'Pinline', false, style));
+	frames.push(makeM15EighthUBFrameByLetter(properties.typeTitle, 'Type', false, style));
+	frames.push(makeM15EighthUBFrameByLetter(properties.typeTitle, 'Title', false, style));
+	if (properties.pinlineRight) {
+		frames.push(makeM15EighthUBFrameByLetter(properties.rulesRight, 'Rules', true, style));
+	}
+	frames.push(makeM15EighthUBFrameByLetter(properties.rules, 'Rules', false, style));
+	if (properties.frameRight) {
+		frames.push(makeM15EighthUBFrameByLetter(properties.frameRight, 'Frame', true, style));
+	}
+	frames.push(makeM15EighthUBFrameByLetter(properties.frame, 'Frame', false, style));
+	frames.push(makeM15EighthUBFrameByLetter(properties.frame, 'Border', false, style));
+
+	if (card.text.pt && type_line.includes('Vehicle') && !card.text.pt.text.includes('fff')) {
+		card.text.pt.text = '{fontcolor#fff}' + card.text.pt.text;
+	}
+
+	card.frames = frames;
+	card.frames.reverse();
+	await card.frames.forEach(item => addFrame([], item));
+	card.frames.reverse();
+}
+async function autoBorderlessFrame(colors, mana_cost, type_line, power) {
+	var frames = card.frames.filter(frame => frame.name.includes('Extension'));
+
+	//clear the draggable frames
+	card.frames = [];
+	document.querySelector('#frame-list').innerHTML = null;
+
+	var properties = cardFrameProperties(colors, mana_cost, type_line, power, 'Borderless');
+	var style = 'regular';
+	if (type_line.toLowerCase().includes('enchantment creature') || type_line.toLowerCase().includes('enchantment artifact')) {
+		style = 'Nyx';
+	}
+
+	// Set frames
+	if (type_line.includes('Legendary')) {
+		if (style == 'Nyx') {
+			if (properties.pinlineRight) {
+				frames.push(makeBorderlessFrameByLetter(properties.pinlineRight, 'Inner Crown', true));
+			}
+			frames.push(makeM15FrameByLetter(properties.pinline, 'Inner Crown', false, style));
+		}
+
+		if (properties.pinlineRight) {
+			frames.push(makeBorderlessFrameByLetter(properties.pinlineRight, 'Crown', true));
+		}
+		frames.push(makeBorderlessFrameByLetter(properties.pinline, "Crown", false, style));
+		frames.push(makeBorderlessFrameByLetter(properties.pinline, "Legend Crown Outline", false))
+		frames.push(makeBorderlessFrameByLetter(properties.pinline, "Crown Border Cover", false));
+	}
+	if (properties.pt) {
+		frames.push(makeBorderlessFrameByLetter(properties.pt, 'PT', false));
+	}
+	if (properties.pinlineRight) {
+		frames.push(makeBorderlessFrameByLetter(properties.pinlineRight, 'Pinline', true));
+	}
+	frames.push(makeBorderlessFrameByLetter(properties.pinline, 'Pinline', false));
+	frames.push(makeBorderlessFrameByLetter(properties.typeTitle, 'Type', false));
+	frames.push(makeBorderlessFrameByLetter(properties.typeTitle, 'Title', false));
+	frames.push(makeBorderlessFrameByLetter(properties.rules, 'Rules', false));
+	frames.push(makeBorderlessFrameByLetter(properties.frame, 'Border', false));
+
+	// if (card.text.pt && type_line.includes('Vehicle') && !card.text.pt.text.includes('fff')) {
+	// 	card.text.pt.text = '{fontcolor#fff}' + card.text.pt.text;
+	// }
+
+	card.frames = frames;
+	card.frames.reverse();
+	await card.frames.forEach(item => addFrame([], item));
+	card.frames.reverse();
+}
+async function auto8thEditionFrame(colors, mana_cost, type_line, power, colorshifted = false) {
+	var frames = card.frames.filter(frame => frame.name.includes('Extension'));
+
+	//clear the draggable frames
+	card.frames = [];
+	document.querySelector('#frame-list').innerHTML = null;
+
+	var properties = cardFrameProperties(colors, mana_cost, type_line, power);
+
+	// Set frames
+	if (properties.pt) {
+		frames.push(make8thEditionFrameByLetter(properties.pt, 'PT', false, colorshifted));
+	}
+	if (properties.pinlineRight) {
+		frames.push(make8thEditionFrameByLetter(properties.pinlineRight, 'Pinline', true, colorshifted));
+	}
+	frames.push(make8thEditionFrameByLetter(properties.pinline, 'Pinline', false, colorshifted));
+	frames.push(make8thEditionFrameByLetter(properties.typeTitle, 'Type', false, colorshifted));
+	frames.push(make8thEditionFrameByLetter(properties.typeTitle, 'Title', false, colorshifted));
+	if (properties.pinlineRight) {
+		frames.push(make8thEditionFrameByLetter(properties.rulesRight, 'Rules', true, colorshifted));
+	}
+	frames.push(make8thEditionFrameByLetter(properties.rules, 'Rules', false, colorshifted));
+	if (properties.frameRight) {
+		frames.push(make8thEditionFrameByLetter(properties.frameRight, 'Frame', true, colorshifted));
+	}
+	frames.push(make8thEditionFrameByLetter(properties.frame, 'Frame', false, colorshifted));
+	frames.push(make8thEditionFrameByLetter(properties.frame, 'Border', false, colorshifted));
+
+	card.frames = frames;
+	card.frames.reverse();
+	await card.frames.forEach(item => addFrame([], item));
+	card.frames.reverse();
+}
+async function autoExtendedArtFrame(colors, mana_cost, type_line, power, short) {
+	var frames = card.frames.filter(frame => frame.name.includes('Extension'));
+
+	//clear the draggable frames
+	card.frames = [];
+	document.querySelector('#frame-list').innerHTML = null;
+
+	var properties = cardFrameProperties(colors, mana_cost, type_line, power);
+	var style = 'regular';
+	if (type_line.toLowerCase().includes('snow')) {
+		style = 'snow';
+	} else if (type_line.toLowerCase().includes('enchantment creature') || type_line.toLowerCase().includes('enchantment artifact')) {
+		style = 'Nyx';
+	}
+
+	// Set frames
+	if (type_line.includes('Legendary')) {
+		frames.push(makeExtendedArtFrameByLetter(properties.pinline, "Crown Outline", false, style, short));
+
+		if (style == 'Nyx') {
+			if (properties.pinlineRight) {
+				frames.push(makeExtendedArtFrameByLetter(properties.pinlineRight, 'Inner Crown', true, style, short));
+			}
+			frames.push(makeExtendedArtFrameByLetter(properties.pinline, 'Inner Crown', false, style, short));
+		}
+
+		if (properties.pinlineRight) {
+			frames.push(makeExtendedArtFrameByLetter(properties.pinlineRight, 'Crown', true, style, short));
+		}
+		frames.push(makeExtendedArtFrameByLetter(properties.pinline, "Crown", false, style, short));
+		frames.push(makeExtendedArtFrameByLetter(properties.pinline, "Crown Border Cover", false, style, short));
+	} else {
+		frames.push(makeExtendedArtFrameByLetter(properties.pinline, "Title Cutout", false, style, short));
+	}
+	if (properties.pt) {
+		frames.push(makeExtendedArtFrameByLetter(properties.pt, 'PT', false, style, short));
+	}
+	if (properties.pinlineRight) {
+		frames.push(makeExtendedArtFrameByLetter(properties.pinlineRight, 'Pinline', true, style, short));
+	}
+	frames.push(makeExtendedArtFrameByLetter(properties.pinline, 'Pinline', false, style, short));
+	frames.push(makeExtendedArtFrameByLetter(properties.typeTitle, 'Type', false, style, short));
+	frames.push(makeExtendedArtFrameByLetter(properties.typeTitle, 'Title', false, style, short));
+	if (properties.pinlineRight) {
+		frames.push(makeExtendedArtFrameByLetter(properties.rulesRight, 'Rules', true, style, short));
+	}
+	frames.push(makeExtendedArtFrameByLetter(properties.rules, 'Rules', false, style, short));
+	if (properties.frameRight) {
+		frames.push(makeExtendedArtFrameByLetter(properties.frameRight, 'Frame', true, style, short));
+	}
+	frames.push(makeExtendedArtFrameByLetter(properties.frame, 'Frame', false, style, short));
+	frames.push(makeExtendedArtFrameByLetter(properties.frame, 'Border', false, style, short));
+
+	if (card.text.pt && type_line.includes('Vehicle') && !card.text.pt.text.includes('fff')) {
+		card.text.pt.text = '{fontcolor#fff}' + card.text.pt.text;
+	}
+
+	card.frames = frames;
+	card.frames.reverse();
+	await card.frames.forEach(item => addFrame([], item));
+	card.frames.reverse();
+}
+async function autoEtchedFrame(colors, mana_cost, type_line, power) {
+	var frames = card.frames.filter(frame => frame.name.includes('Extension'));
+
+	//clear the draggable frames
+	card.frames = [];
+	document.querySelector('#frame-list').innerHTML = null;
+
+	var properties = cardFrameProperties(colors, mana_cost, type_line, power, 'Etched');
+	var style = 'regular';
+	if (type_line.toLowerCase().includes('snow')) {
+		style = 'snow';
+	} else if (type_line.toLowerCase().includes('enchantment creature') || type_line.toLowerCase().includes('enchantment artifact')) {
+		style = 'Nyx';
+	}
+
+	// Set frames
+
+	if (type_line.includes('Legendary')) {
+		if (style == 'Nyx') {
+			if (properties.frameRight) {
+				frames.push(makeEtchedFrameByLetter(properties.pinlineRight, 'Inner Crown', true));
+			}
+			frames.push(makeEtchedFrameByLetter(properties.pinline, 'Inner Crown', false, style));
+		}
+
+		if (properties.frameRight) {
+			frames.push(makeEtchedFrameByLetter(properties.frameRight, 'Crown', true));
+		}
+		frames.push(makeEtchedFrameByLetter(properties.frame, "Crown", false));
+		frames.push(makeEtchedFrameByLetter(properties.frame, "Crown Border Cover", false));
+	}
+	if (properties.pt) {
+		frames.push(makeEtchedFrameByLetter(properties.pt, 'PT', false));
+	}
+	frames.push(makeEtchedFrameByLetter(properties.typeTitle, 'Type', false));
+	frames.push(makeEtchedFrameByLetter(properties.typeTitle, 'Title', false));
+	if (properties.pinlineRight) {
+		frames.push(makeEtchedFrameByLetter(properties.rulesRight, 'Rules', true));
+	}
+	frames.push(makeEtchedFrameByLetter(properties.rules, 'Rules', false));
+	if (properties.frameRight) {
+		frames.push(makeEtchedFrameByLetter(properties.frameRight, 'Frame', true, style));
+	}
+	frames.push(makeEtchedFrameByLetter(properties.frame, 'Frame', false, style));
+	frames.push(makeEtchedFrameByLetter(properties.frame, 'Border', false));
+
+	card.frames = frames;
+	card.frames.reverse();
+	await card.frames.forEach(item => addFrame([], item));
+	card.frames.reverse();
+}
+async function autoPhyrexianFrame(colors, mana_cost, type_line, power) {
+	var frames = card.frames.filter(frame => frame.name.includes('Extension'));
+
+	//clear the draggable frames
+	card.frames = [];
+	document.querySelector('#frame-list').innerHTML = null;
+
+	var properties = cardFrameProperties(colors, mana_cost, type_line, power, 'Phyrexian');
+
+	// Set frames
+
+	if (type_line.toLowerCase().includes('legendary')) {
+		if (properties.pinlineRight) {
+			frames.push(makePhyrexianFrameByLetter(properties.pinlineRight, 'Crown', true));
+		}
+		frames.push(makePhyrexianFrameByLetter(properties.pinline, "Crown", false));
+	}
+	if (properties.pt) {
+		frames.push(makePhyrexianFrameByLetter(properties.pt, 'PT', false));
+	}
+	if (properties.pinlineRight) {
+		frames.push(makePhyrexianFrameByLetter(properties.pinlineRight, 'Pinline', true));
+	}
+	frames.push(makePhyrexianFrameByLetter(properties.pinline, 'Pinline', false));
+	frames.push(makePhyrexianFrameByLetter(properties.typeTitle, 'Type', false));
+	frames.push(makePhyrexianFrameByLetter(properties.typeTitle, 'Title', false));
+	if (properties.pinlineRight) {
+		frames.push(makePhyrexianFrameByLetter(properties.rulesRight, 'Rules', true));
+	}
+	frames.push(makePhyrexianFrameByLetter(properties.rules, 'Rules', false));
+	if (properties.frameRight) {
+		frames.push(makePhyrexianFrameByLetter(properties.frameRight, 'Frame', true));
+	}
+	frames.push(makePhyrexianFrameByLetter(properties.frame, 'Frame', false));
+	frames.push(makePhyrexianFrameByLetter(properties.frame, 'Border', false));
+
+	card.frames = frames;
+	card.frames.reverse();
+	await card.frames.forEach(item => addFrame([], item));
+	card.frames.reverse();
+}
+async function autoSeventhEditionFrame(colors, mana_cost, type_line, power) {
+	var frames = card.frames.filter(frame => frame.name.includes('Extension') || frame.name.includes('DCI Star'));
+
+	//clear the draggable frames
+	card.frames = [];
+	document.querySelector('#frame-list').innerHTML = null;
+
+	var properties = cardFrameProperties(colors, mana_cost, type_line, power, 'Seventh');
+
+	// Set frames
+	frames.push(makeSeventhEditionFrameByLetter(properties.pinline, 'Pinline', false));
+	if (properties.rulesRight) {
+		frames.push(makeSeventhEditionFrameByLetter(properties.rulesRight, 'Rules', true));
+	}
+	frames.push(makeSeventhEditionFrameByLetter(properties.rules, 'Rules', false));
+	frames.push(makeSeventhEditionFrameByLetter(properties.frame, 'Frame', false));
+	frames.push(makeSeventhEditionFrameByLetter(properties.pinline, 'Textbox Pinline', false));
+	frames.push(makeSeventhEditionFrameByLetter(properties.frame, 'Border', false));
+
+	card.frames = frames;
+	card.frames.reverse();
+	await card.frames.forEach(item => addFrame([], item));
+	card.frames.reverse();
+}
+function makeM15FrameByLetter(letter, mask = false, maskToRightHalf = false, style = 'regular') {
+	letter = letter.toUpperCase();
+	var frameNames = {
+		'W': 'White',
+		'U': 'Blue',
+		'B': 'Black',
+		'R': 'Red',
+		'G': 'Green',
+		'M': 'Multicolored',
+		'A': 'Artifact',
+		'L': 'Land',
+		'C': 'Colorless',
+		'V': 'Vehicle',
+		'WL': 'White Land',
+		'UL': 'Blue Land',
+		'BL': 'Black Land',
+		'RL': 'Red Land',
+		'GL': 'Green Land',
+		'ML': 'Multicolored Land'
+	}
+
+	if ((mask.includes('Crown') || mask == 'PT' || mask.includes('Stamp')) && letter.includes('L') && letter.length > 1) {
+		letter = letter[0];
+	}
+
+	var frameName = frameNames[letter];
+
+	if (mask == "Crown Border Cover") {
+		return {
+			'name': 'Legend Crown Border Cover',
+			'src': '/img/black.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0177,
+				'width': 0.9214,
+				'x': 0.0394,
+				'y': 0.0277
+			}
+		}
+	}
+
+	if (mask == "Crown") {
+		var frame = {
+			'name': frameName + ' Legend Crown',
+			'src': '/img/frames/m15/crowns/m15Crown' + letter + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.1667,
+				'width': 0.9454,
+				'x': 0.0274,
+				'y': 0.0191
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == "Inner Crown") {
+		var frame = {
+			'name': frameName + ' ' + mask + ' (' + style + ')',
+			'src': '/img/frames/m15/innerCrowns/m15InnerCrown' + letter + style + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0239,
+				'width': 0.672,
+				'x': 0.164,
+				'y': 0.0239
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == 'PT') {
+		return {
+			'name': frameName + ' Power/Toughness',
+			'src': '/img/frames/m15/regular/m15PT' + letter + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0733,
+				'width': 0.188,
+				'x': 0.7573,
+				'y': 0.8848
+			}
+		}
+	}
+
+	var frame = {
+		'name': frameName + ' Frame',
+		'src': '/img/frames/m15/' + style.toLowerCase() + '/m15Frame' + letter + '.png',
+	}
+
+	if (style == 'snow') {
+		frame.src = frame.src.replace('m15Frame' + letter, letter.toLowerCase());
+	} else {
+		if (letter.includes('L') && letter.length > 1) {
+			frame.src = frame.src.replace(('m15Frame' + letter), 'l' + letter[0].toLowerCase())
+		}
+
+		if (style == 'Nyx') {
+			frame.src = frame.src.replace('.png', 'Nyx.png');
+		}
+	}
+
+	if (mask) {
+		frame.masks = [
+			{
+				'src': '/img/frames/m15/regular/m15Mask' + mask + '.png',
+				'name': mask
+			}
+		]
+
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+	} else {
+		frame.masks = [];
+	}
+
+	return frame;
+}
+
+function makeM15NewFrameByLetter(letter, mask = false, maskToRightHalf = false, style = 'regular') {
+	letter = letter.toUpperCase();
+	var frameNames = {
+		'W': 'White',
+		'U': 'Blue',
+		'B': 'Black',
+		'R': 'Red',
+		'G': 'Green',
+		'M': 'Multicolored',
+		'A': 'Artifact',
+		'L': 'Land',
+		'C': 'Colorless',
+		'V': 'Vehicle',
+		'WL': 'White Land',
+		'UL': 'Blue Land',
+		'BL': 'Black Land',
+		'RL': 'Red Land',
+		'GL': 'Green Land',
+		'ML': 'Multicolored Land'
+	}
+
+	if (letter.length == 2) {
+		letter = letter.split("").reverse().join("");
+	}
+
+	if ((mask.includes('Crown') || mask == 'PT' || mask.includes('Stamp')) && letter.includes('L') && letter.length > 1) {
+		letter = letter[1];
+	}
+
+	var frameName = frameNames[letter];
+
+	if (mask == "Crown Border Cover") {
+		return {
+			'name': 'Legend Crown Border Cover',
+			'src': '/img/black.png',
+			'masks': [],
+			'bounds': {x:0, y:0, width:1, height:137/2814}
+		}
+	}
+
+	if (mask == "Crown") {
+		var framePath = '';
+		if (style == 'ub') {
+			framePath = 'ub/';
+		}
+		var frame = {
+			'name': frameName + ' Legend Crown',
+			'src': '/img/frames/m15/' + framePath + 'crowns/new/' + letter.toLowerCase() + '.png',
+			'masks': [],
+			'bounds': {x:44/2010, y:53/2814, width:1922/2010, height:493/2814}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == "Inner Crown") {
+		var frame = {
+			'name': frameName + ' ' + mask + ' (' + style + ')',
+			'src': '/img/frames/m15/innerCrowns/new/' + style.toLowerCase() + '/' + letter.toLowerCase() + '.png',
+			'masks': [],
+			'bounds': {x:329/2010, y:70/2814, width:1353/2010, height:64/2814}
+		};
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	} else if (mask == "Stamp") {
+		if (style == 'ub') {
+			var frame = {
+				'name': frameName + ' Holo Stamp',
+				'src': '/img/frames/m15/new/ub/stamp/' + letter.toLowerCase() + '.png',
+				'masks': [],
+				'bounds': {x:857/2015, y:2534/2814, width:299/2015, height:137/2814}
+			}
+			if (maskToRightHalf) {
+				frame.masks.push({
+					'src': '/img/frames/maskRightHalf.png',
+					'name': 'Right Half'
+				});
+			}
+			return frame;
+		}
+	}
+
+	if (mask == 'PT') {
+		var path = '/img/frames/m15/regular/m15PT';
+		if (style == 'ub') {
+			path = '/img/frames/m15/ub/pt/';
+			letter = letter.toLowerCase();
+		}
+		return {
+			'name': frameName + ' Power/Toughness',
+			'src': path + letter + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0733,
+				'width': 0.188,
+				'x': 0.7573,
+				'y': 0.8848
+			}
+		}
+	}
+
+	var stylePath = '';
+	if (style != 'regular') {
+		stylePath = style.toLowerCase() + '/';
+	}
+	var frame = {
+		'name': frameName + ' Frame',
+		'src': '/img/frames/m15/new/' + stylePath + letter.toLowerCase() + '.png',
+	}
+
+	// if (letter.includes('L') && letter.length > 1) {
+	// 	frame.src = frame.src.replace(('m15Frame' + letter), 'l' + letter[0].toLowerCase())
+	// }
+
+	if (mask) {
+		frame.masks = [
+			{
+				'src': '/img/frames/m15/new/' + mask.toLowerCase() + '.png',
+				'name': mask
+			}
+		]
+
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+	} else {
+		frame.masks = [];
+	}
+
+	return frame;
+}
+function makeM15EighthFrameByLetter(letter, mask = false, maskToRightHalf = false, style = 'regular') {
+	letter = letter.toUpperCase();
+	var frameNames = {
+		'W': 'White',
+		'U': 'Blue',
+		'B': 'Black',
+		'R': 'Red',
+		'G': 'Green',
+		'M': 'Multicolored',
+		'A': 'Artifact',
+		'L': 'Land',
+		'C': 'Colorless',
+		'V': 'Vehicle',
+		'WL': 'White Land',
+		'UL': 'Blue Land',
+		'BL': 'Black Land',
+		'RL': 'Red Land',
+		'GL': 'Green Land',
+		'ML': 'Multicolored Land'
+	}
+
+	if ((mask.includes('Crown') || mask == 'PT' || mask.includes('Stamp')) && letter.includes('L') && letter.length > 1) {
+		letter = letter[0];
+	}
+
+	var frameName = frameNames[letter];
+
+	if (mask == "Crown Border Cover") {
+		return {
+			'name': 'Legend Crown Border Cover',
+			'src': '/img/black.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0177,
+				'width': 0.9214,
+				'x': 0.0394,
+				'y': 0.0277
+			}
+		}
+	}
+
+	if (mask == "Crown") {
+		var frame = {
+			'name': frameName + ' Legend Crown',
+			'src': '/img/frames/m15/crowns/m15Crown' + letter + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.1667,
+				'width': 0.9454,
+				'x': 0.0274,
+				'y': 0.0191
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == "Inner Crown") {
+		var frame = {
+			'name': frameName + ' ' + mask + ' (' + style + ')',
+			'src': '/img/frames/m15/innerCrowns/m15InnerCrown' + letter + style + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0239,
+				'width': 0.672,
+				'x': 0.164,
+				'y': 0.0239
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == 'PT') {
+		return {
+			'name': frameName + ' Power/Toughness',
+			'src': '/img/frames/m15/regular/m15PT' + letter + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0733,
+				'width': 0.188,
+				'x': 0.7573,
+				'y': 1901/2100
+			}
+		}
+	}
+
+	var frame = {
+		'name': frameName + ' Frame',
+		'src': '/img/frames/custom/m15-eighth/' + style.toLowerCase() + '/' + letter.toLowerCase() + '.png',
+	}
+
+	if (style != 'regular') {
+		frame.name = style.charAt(0).toUpperCase() + style.slice(1) + ' ' + frame.name;
+	}
+
+	if (mask) {
+		if (mask.toLowerCase() == 'border' || mask.toLowerCase() == 'frame') {
+			frame.masks = [
+				{
+					'src': '/img/frames/custom/m15-eighth/regular/' + mask + '.png',
+					'name': mask
+				}
+			]
+		} else {
+			frame.masks = [
+				{
+					'src': '/img/frames/m15/regular/m15Mask' + mask + '.png',
+					'name': mask
+				}
+			]
+		}
+
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+	} else {
+		frame.masks = [];
+	}
+
+	return frame;
+}
+function makeM15EighthUBFrameByLetter(letter, mask = false, maskToRightHalf = false) {
+	letter = letter.toUpperCase();
+	var frameNames = {
+		'W': 'White',
+		'U': 'Blue',
+		'B': 'Black',
+		'R': 'Red',
+		'G': 'Green',
+		'M': 'Multicolored',
+		'A': 'Artifact',
+		'L': 'Land',
+		'C': 'Colorless',
+		'V': 'Vehicle',
+		'WL': 'White Land',
+		'UL': 'Blue Land',
+		'BL': 'Black Land',
+		'RL': 'Red Land',
+		'GL': 'Green Land',
+		'ML': 'Multicolored Land'
+	}
+
+	if ((mask.includes('Crown') || mask == 'PT' || mask.includes('Stamp')) && letter.includes('L') && letter.length > 1) {
+		letter = letter[0];
+	}
+
+	var frameName = frameNames[letter];
+
+	if (mask == "Crown Border Cover") {
+		return {
+			'name': 'Legend Crown Border Cover',
+			'src': '/img/black.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0177,
+				'width': 0.9214,
+				'x': 0.0394,
+				'y': 0.0277
+			}
+		}
+	}
+
+	if (mask == "Crown") {
+		var frame = {
+			'name': frameName + ' Legend Crown',
+			'src': '/img/frames/m15/ub/crowns/m15Crown' + letter + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.1667,
+				'width': 0.9454,
+				'x': 0.0274,
+				'y': 0.0191
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == "Inner Crown") {
+		var frame = {
+			'name': frameName + ' ' + mask + ' (' + style + ')',
+			'src': '/img/frames/m15/innerCrowns/m15InnerCrown' + letter + style + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0239,
+				'width': 0.672,
+				'x': 0.164,
+				'y': 0.0239
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == 'PT') {
+		return {
+			'name': frameName + ' Power/Toughness',
+			'src': '/img/frames/m15/ub/pt/' + letter + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0733,
+				'width': 0.188,
+				'x': 0.7573,
+				'y': 1901/2100
+			}
+		}
+	}
+
+	var frame = {
+		'name': frameName + ' Frame',
+		'src': '/img/frames/custom/m15-eighth/ub/' + letter.toLowerCase() + '.png',
+	}
+
+	if (mask) {
+		if (mask.toLowerCase() == 'border' || mask.toLowerCase() == 'frame') {
+			frame.masks = [
+				{
+					'src': '/img/frames/custom/m15-eighth/regular/' + mask + '.png',
+					'name': mask
+				}
+			]
+		} else {
+			frame.masks = [
+				{
+					'src': '/img/frames/m15/regular/m15Mask' + mask + '.png',
+					'name': mask
+				}
+			]
+		}
+
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+	} else {
+		frame.masks = [];
+	}
+
+	return frame;
+}
+function makeBorderlessFrameByLetter(letter, mask = false, maskToRightHalf = false, style) {
+	letter = letter.toUpperCase();
+
+	if (letter == 'V') {
+		letter = 'A';
+	}
+
+	if (letter == 'ML') {
+		letter = 'M';
+	} else if (letter.includes('L') && letter.length > 1) {
+		letter = letter[0];
+	}
+
+	var frameNames = {
+		'W': 'White',
+		'U': 'Blue',
+		'B': 'Black',
+		'R': 'Red',
+		'G': 'Green',
+		'M': 'Multicolored',
+		'A': 'Artifact',
+		'L': 'Land',
+		'C': 'Colorless'
+	}
+
+	if ((mask.includes('Crown') || mask == 'PT' || mask.includes('Stamp')) && letter.includes('L') && letter.length > 1) {
+		letter = letter[0];
+	}
+
+	var frameName = frameNames[letter];
+
+	if (mask == "Legend Crown Outline") {
+		return {
+			'name': 'Legend Crown Outline',
+			'src': '/img/frames/m15/crowns/m15CrownFloatingOutline.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.1062,
+				'width': 0.944,
+				'x': 0.028,
+				'y': 0.0172
+			}
+		};
+	}
+
+	if (mask == "Crown Border Cover") {
+		return {
+			'name': 'Legend Crown Border Cover',
+			'erase': true,
+			'src': '/img/black.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0177,
+				'width': 0.9214,
+				'x': 0.0394,
+				'y': 0.0277
+			}
+		}
+	}
+
+	if (mask == "Crown") {
+		var frame = {
+			'name': frameName + ' Legend Crown',
+			'src': '/img/frames/m15/crowns/m15Crown' + letter + 'Floating.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.1024,
+				'width': 0.9387,
+				'x': 0.0307,
+				'y': 0.0191
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == "Inner Crown") {
+		var frame = {
+			'name': frameName + ' ' + mask + ' (' + style + ')',
+			'src': '/img/frames/m15/innerCrowns/m15InnerCrown' + letter + style + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0239,
+				'width': 0.672,
+				'x': 0.164,
+				'y': 0.0239
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == 'PT') {
+		return {
+			'name': frameName + ' Power/Toughness',
+			'src': '/img/frames/m15/borderless/pt/' + letter.toLowerCase() + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.066666666666,
+				'width': 0.182666666666,
+				'x': 0.764,
+				'y': 0.8861904761904762
+			}
+		}
+	}
+
+	var frame = {
+		'name': frameName + ' Frame',
+		'src': '/img/frames/m15/borderless/m15GenericShowcaseFrame' + letter + '.png',
+	}
+
+	if (letter.includes('L') && letter.length > 1) {
+		frame.src = frame.src.replace(('m15GenericShowcaseFrame' + letter), 'l' + letter[0].toLowerCase())
+	}
+
+	if (mask) {
+		if (mask == 'Pinline') {
+			frame.masks = [
+				{
+					'src': '/img/frames/m15/genericShowcase/m15GenericShowcaseMask' + mask + '.png',
+					'name': mask
+				}
+			];
+		} else {
+			frame.masks = [
+				{
+					'src': '/img/frames/m15/regular/m15Mask' + mask + '.png',
+					'name': mask
+				}
+			];
+		}
+
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+	} else {
+		frame.masks = [];
+	}
+
+	return frame;
+}
+function make8thEditionFrameByLetter(letter, mask = false, maskToRightHalf = false, style = 'regular') {
+	letter = letter.toUpperCase();
+	var frameNames = {
+		'W': 'White',
+		'U': 'Blue',
+		'B': 'Black',
+		'R': 'Red',
+		'G': 'Green',
+		'M': 'Multicolored',
+		'A': 'Artifact',
+		'L': 'Land',
+		'C': 'Colorless',
+		'WL': 'White Land',
+		'UL': 'Blue Land',
+		'BL': 'Black Land',
+		'RL': 'Red Land',
+		'GL': 'Green Land',
+		'ML': 'Multicolored Land'
+	}
+
+	if (mask == 'PT') {
+		if (letter.length > 1) {
+			letter = letter[0];
+		} else if (letter == 'C') {
+			letter = 'L';
+		}
+	}
+
+	if (letter == 'V') {
+		letter = 'A';
+	}
+
+	var frameName = frameNames[letter];
+
+	if (mask == 'PT') {
+		return {
+			'name': frameName + ' Power/Toughness',
+			'src': '/img/frames/8th/pt/' + letter.toLowerCase() + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0839,
+				'width': 0.2147,
+				'x': 0.7227,
+				'y': 0.8796
+			}
+		}
+	}
+
+	var frame = {
+		'name': frameName + ' Frame',
+		'src': '/img/frames/8th/' + letter.toLowerCase() + '.png',
+	}
+
+	if (letter.includes('L') && letter.length > 1) {
+		frame.src = frame.src.replace(('m15Frame' + letter), 'l' + letter[0].toLowerCase())
+	}
+
+	if (mask) {
+		frame.masks = [
+			{
+				'src': '/img/frames/8th/' + mask.toLowerCase() + '.png',
+				'name': mask
+			}
+		]
+
+		if (mask == 'Border') {
+			frame.masks[0].src = frame.masks[0].src.replace('.png', '.svg');
+		}
+
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+	} else {
+		frame.masks = [];
+	}
+
+	return frame;
+}
+function makeExtendedArtFrameByLetter(letter, mask = false, maskToRightHalf = false, style = 'regular', short = false) {
+	letter = letter.toUpperCase();
+	var frameNames = {
+		'W': 'White',
+		'U': 'Blue',
+		'B': 'Black',
+		'R': 'Red',
+		'G': 'Green',
+		'M': 'Multicolored',
+		'A': 'Artifact',
+		'L': 'Land',
+		'C': 'Colorless',
+		'V': 'Vehicle',
+		'WL': 'White Land',
+		'UL': 'Blue Land',
+		'BL': 'Black Land',
+		'RL': 'Red Land',
+		'GL': 'Green Land',
+		'ML': 'Multicolored Land'
+	}
+
+	if ((mask.includes('Crown') || mask == 'PT' || mask.includes('Stamp')) && letter.includes('L') && letter.length > 1) {
+		letter = letter[0];
+	}
+
+	var frameName = frameNames[letter];
+
+	if (mask == "Crown Border Cover") {
+		return {
+			'name': 'Legend Crown Border Cover',
+			'src': '/img/black.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0177,
+				'width': 0.9214,
+				'x': 0.0394,
+				'y': 0.0277
+			}
+		}
+	}
+
+	if (mask == "Legend Crown Outline") {
+		return {
+			'name': 'Legend Crown Outline',
+			'src': '/img/frames/m15/crowns/m15CrownFloatingOutline.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.1062,
+				'width': 0.944,
+				'x': 0.028,
+				'y': 0.0172
+			}
+		};
+	}
+
+	if (mask == "Crown") {
+		var frame = {
+			'name': frameName + ' Legend Crown',
+			'src': '/img/frames/m15/crowns/m15Crown' + letter + 'Floating.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.1024,
+				'width': 0.9387,
+				'x': 0.0307,
+				'y': 0.0191
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == "Crown Outline") {
+		var frame = {
+			'name': 'Legend Crown Outline',
+			'src': '/img/frames/m15/crowns/m15CrownFloatingOutline.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.1062,
+				'width': 0.944,
+				'x': 0.028,
+				'y': 0.0172
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == "Inner Crown") {
+		var frame = {
+			'name': frameName + '(' + style + ')' + mask,
+			'src': '/img/frames/m15/innerCrowns/m15InnerCrown' + letter + style + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0239,
+				'width': 0.672,
+				'x': 0.164,
+				'y': 0.0239
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == 'PT') {
+		return {
+			'name': frameName + ' Power/Toughness',
+			'src': '/img/frames/m15/regular/m15PT' + letter + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0733,
+				'width': 0.188,
+				'x': 0.7573,
+				'y': 0.8848
+			}
+		}
+	}
+
+	var frame = {
+		'name': frameName + ' Frame'
+	}
+
+	if (style != 'regular') {
+		frame.src = '/img/frames/extended/regular/' + style.toLowerCase() + '/' + letter.toLowerCase() + '.png';
+		if (short) {
+			frame.src = frame.src.replace('/regular/', '/shorter/');
+		}
+	} else if (short) {
+		frame.src = '/img/frames/m15/boxTopper/short/' + letter.toLowerCase() + '.png';
+	} else {
+		frame.src = '/img/frames/m15/boxTopper/m15BoxTopperFrame' + letter + '.png';
+	}
+
+	if (mask) {
+		if (mask == 'Title Cutout') {
+			if (short) {
+				frame.masks = [
+					{
+						'src': '/img/frames/extended/shorter/titleCutout.png',
+						'name': 'Title Cutout'
+					}
+				]
+			} else {
+				frame.masks = [
+					{
+						'src': '/img/frames/m15/boxTopper/m15BoxTopperTitleCutout.png',
+						'name': 'Title Cutout'
+					}
+				]
+			}
+		} else if (short && ['Frame', 'Rules', 'Type', 'Pinline'].includes(mask)) {
+			var extension = mask == 'Type' ? '.png' : '.svg';
+
+			frame.masks = [
+				{
+					'src': '/img/frames/m15/boxTopper/short/' + mask.toLowerCase().replace('rules', 'text') + extension,
+					'name': mask
+				}
+			]
+		} else {
+			frame.masks = [
+				{
+					'src': '/img/frames/m15/regular/m15Mask' + mask + '.png',
+					'name': mask
+				}
+			]
+		}
+
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+	} else {
+		frame.masks = [];
+	}
+
+	return frame;
+}
+function makeUBFrameByLetter(letter, mask = false, maskToRightHalf = false) {
+	letter = letter.toUpperCase();
+
+	if (letter == 'C') {
+		letter = 'L';
+	}
+
+	var frameNames = {
+		'W': 'White',
+		'U': 'Blue',
+		'B': 'Black',
+		'R': 'Red',
+		'G': 'Green',
+		'M': 'Multicolored',
+		'A': 'Artifact',
+		'L': 'Land',
+		'C': 'Colorless',
+		'V': 'Vehicle',
+		'WL': 'White Land',
+		'UL': 'Blue Land',
+		'BL': 'Black Land',
+		'RL': 'Red Land',
+		'GL': 'Green Land',
+		'ML': 'Multicolored Land'
+	}
+
+	if ((mask.includes('Crown') || mask == 'PT' || mask.includes('Stamp')) && letter.includes('L') && letter.length > 1) {
+		letter = letter[0];
+	}
+
+	var frameName = frameNames[letter];
+
+	if (mask == "Crown Border Cover") {
+		return {
+			'name': 'Legend Crown Border Cover',
+			'src': '/img/black.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0177,
+				'width': 0.9214,
+				'x': 0.0394,
+				'y': 0.0277
+			}
+		}
+	}
+
+	if (mask == "Crown") {
+		var frame = {
+			'name': frameName + ' Legend Crown',
+			'src': '/img/frames/m15/ub/crowns/m15Crown' + letter + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.1667,
+				'width': 0.9454,
+				'x': 0.0274,
+				'y': 0.0191
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	} else if (mask == "Stamp") {
+		var frame = {
+			'name': frameName + ' Holo Stamp',
+			'src': '/img/frames/m15/ub/regular/stamp/' + letter.toLowerCase() + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0486,
+				'width': 0.1494,
+				'x': 0.4254,
+				'y': 0.9005
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == 'PT') {
+		return {
+			'name': frameName + ' Power/Toughness',
+			'src': '/img/frames/m15/ub/pt/' + (letter == 'L' ? 'C' : letter).toLowerCase() + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0733,
+				'width': 0.188,
+				'x': 0.7573,
+				'y': 0.8848
+			}
+		}
+	}
+
+	var frame = {
+		'name': frameName + ' Frame',
+		'src': '/img/frames/m15/ub/regular/' + letter.toLowerCase() + '.png',
+	}
+
+	if (mask) {
+		frame.masks = [
+			{
+				'src': '/img/frames/m15/regular/m15Mask' + mask + '.png',
+				'name': mask
+			}
+		]
+
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+	} else {
+		frame.masks = [];
+	}
+
+	return frame;
+}
+function makeCircuitFrameByLetter(letter, mask = false, maskToRightHalf = false) {
+	letter = letter.toUpperCase();
+
+	if (letter == 'C') {
+		letter = 'L';
+	}
+
+	var frameNames = {
+		'W': 'White',
+		'U': 'Blue',
+		'B': 'Black',
+		'R': 'Red',
+		'G': 'Green',
+		'M': 'Multicolored',
+		'A': 'Artifact',
+		'L': 'Land',
+		'C': 'Colorless',
+		'V': 'Vehicle',
+		'WL': 'White Land',
+		'UL': 'Blue Land',
+		'BL': 'Black Land',
+		'RL': 'Red Land',
+		'GL': 'Green Land',
+		'ML': 'Multicolored Land'
+	}
+
+	if ((mask.includes('Crown') || mask == 'PT' || mask.includes('Stamp')) && letter.includes('L') && letter.length > 1) {
+		letter = letter[0];
+	}
+
+	var frameName = frameNames[letter];
+
+	if (mask == "Crown Border Cover") {
+		return {
+			'name': 'Legend Crown Border Cover',
+			'src': '/img/black.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0177,
+				'width': 0.9214,
+				'x': 0.0394,
+				'y': 0.0277
+			}
+		}
+	}
+
+	if (mask == "Crown") {
+		var frame = {
+			'name': frameName + ' Legend Crown',
+			'src': '/img/frames/m15/ub/crowns/m15Crown' + letter + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.1667,
+				'width': 0.9454,
+				'x': 0.0274,
+				'y': 0.0191
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == 'PT') {
+		return {
+			'name': frameName + ' Power/Toughness',
+			'src': '/img/frames/m15/ub/pt/' + (letter == 'L' ? 'C' : letter).toLowerCase() + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0733,
+				'width': 0.188,
+				'x': 0.7573,
+				'y': 0.8848
+			}
+		}
+	}
+
+	var frame = {
+		'name': frameName + ' Frame',
+		'src': '/img/frames/custom/circuit/' + letter.toLowerCase() + '.png',
+	}
+
+	if (mask) {
+		frame.masks = [
+			{
+				'src': '/img/frames/m15/regular/m15Mask' + mask + '.png',
+				'name': mask
+			}
+		]
+
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+	} else {
+		frame.masks = [];
+	}
+
+	return frame;
+}
+function makeEtchedFrameByLetter(letter, mask = false, maskToRightHalf = false, style = 'regular') {
+	letter = letter.toUpperCase();
+	var frameNames = {
+		'W': 'White',
+		'U': 'Blue',
+		'B': 'Black',
+		'R': 'Red',
+		'G': 'Green',
+		'M': 'Multicolored',
+		'A': 'Artifact',
+		'L': 'Land',
+		'C': 'Colorless',
+		'V': 'Vehicle'
+	}
+
+	if (mask == 'PT' && letter.includes('L') && letter.length > 1) {
+		letter = letter[0];
+	}
+
+	if (letter == 'ML') {
+		letter = 'M';
+	} else if (letter.includes('L') && letter.length > 1) {
+		letter = letter[0];
+	} else if (letter == 'V' && mask == 'Crown') {
+		letter = 'A';
+	}
+
+	var frameName = frameNames[letter];
+
+	if (mask == "Crown Border Cover") {
+		return {
+			'name': 'Legend Crown Cover',
+			'src': '/img/frames/etched/regular/crowns/cover.svg',
+			'masks': [],
+			'bounds': {	}
+		}
+	}
+
+	if (mask == "Crown") {
+		var frame = {
+			'name': frameName + ' Legend Crown',
+			'src': '/img/frames/etched/regular/crowns/' + letter.toLowerCase() + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.092,
+				'width': 0.9387,
+				'x': 0.0307,
+				'y': 0.0191
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == "Inner Crown") {
+		var frame = {
+			'name': frameName + ' Inner Crown',
+			'src': '/img/frames/etched/regular/innerCrowns/' + style.toLowerCase() + '/' + letter.toLowerCase() + '.png',
+			'masks': [],
+			'bounds': {x:244/1500, y:51/2100, width:1012/1500, height:64/2100}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == 'PT') {
+		return {
+			'name': frameName + ' Power/Toughness',
+			'src': '/img/frames/etched/regular/pt/' + letter.toLowerCase() + '.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0733,
+				'width': 0.188,
+				'x': 0.7573,
+				'y': 0.8848
+			}
+		}
+	}
+
+	var frame = {
+		'name': frameName + ' Frame',
+		'src': '/img/frames/etched/regular/' + letter.toLowerCase() + '.png',
+	}
+
+	if (style != 'regular') {
+		frame.src = frame.src.replace('/regular/', '/regular/' + style.toLowerCase() + '/');
+		frame.name = frame.name += ' (' + style +')';
+	}
+
+	if (mask) {
+		frame.masks = [
+			{
+				'src': '/img/frames/etched/regular/' + mask.toLowerCase() + '.svg',
+				'name': mask
+			}
+		]
+
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+	} else {
+		frame.masks = [];
+	}
+
+	return frame;
+}
+function makePhyrexianFrameByLetter(letter, mask = false, maskToRightHalf = false) {
+	if (letter == 'C' || letter == 'V') {
+		letter = 'L';
+	}
+
+	if (mask == 'Rules') {
+		mask = 'Rules Text';
+	}
+
+	letter = letter.toUpperCase();
+	var frameNames = {
+		'W': 'White',
+		'U': 'Blue',
+		'B': 'Black',
+		'R': 'Red',
+		'G': 'Green',
+		'M': 'Multicolored',
+		'A': 'Artifact',
+		'L': 'Land'
+	}
+
+	if (mask == 'PT' && letter.includes('L') && letter.length > 1) {
+		letter = letter[0];
+	}
+
+	if (letter == 'ML') {
+		letter = 'M';
+	} else if (letter.includes('L') && letter.length > 1) {
+		letter = letter[0];
+	}
+
+	var frameName = frameNames[letter];
+
+	if (mask == "Crown") {
+		var frame = {
+			'name': frameName + ' Legendary Crown',
+			'src': '/img/frames/m15/praetors/' + letter.toLowerCase() + 'Crown.png',
+			'masks': [],
+			'bounds': {
+				'height': 100/2100,
+				'width': 1,
+				'x': 0,
+				'y': 0
+			}
+		}
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+		return frame;
+	}
+
+	if (mask == 'PT') {
+		return {
+			'name': frameName + ' Power/Toughness',
+			'src': '/img/frames/m15/praetors/' + letter.toLowerCase() + 'pt.png',
+			'masks': [],
+			'bounds': {
+				'height': 0.0772,
+				'width': 0.212,
+				'x': 0.746,
+				'y': 0.8858
+			}
+		}
+	}
+
+	var frame = {
+		'name': frameName + ' Frame',
+		'src': '/img/frames/m15/praetors/' + letter.toLowerCase() + '.png',
+	}
+
+	if (mask == 'Type' || mask == 'Title') {
+		frame.masks = [
+			{
+				'src': '/img/frames/m15/regular/m15Mask' + mask + '.png',
+				'name': mask
+			}
+		]
+
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+	} else if (mask) {
+		var extension = "png";
+		var name = mask.toLowerCase();
+		if (mask == 'Frame') {
+			extension = 'svg';
+		} else if (mask == 'Rules Text') {
+			extension = 'svg';
+			name = 'text';
+		}
+
+		frame.masks = [
+			{
+				'src': '/img/frames/m15/praetors/' + name + '.' + extension,
+				'name': mask
+			}
+		]
+
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+	} else {
+		frame.masks = [];
+	}
+
+	return frame;
+}
+function makeSeventhEditionFrameByLetter(letter, mask = false, maskToRightHalf = false) {
+	letter = letter.toUpperCase();
+	var frameNames = {
+		'W': 'White',
+		'U': 'Blue',
+		'B': 'Black',
+		'R': 'Red',
+		'G': 'Green',
+		'M': 'Multicolored',
+		'A': 'Artifact',
+		'L': 'Land',
+		'C': 'Colorless',
+		'V': 'Vehicle',
+		'WL': 'White Land',
+		'UL': 'Blue Land',
+		'BL': 'Black Land',
+		'RL': 'Red Land',
+		'GL': 'Green Land'
+	}
+
+	if (letter == 'V') {
+		letter = 'A';
+	}
+
+	if (letter == 'ML') {
+		letter = 'L';
+	}
+
+	var frameName = frameNames[letter];
+
+	var frame = {
+		'name': frameName + ' Frame',
+		'src': '/img/frames/seventh/regular/' + letter.toLowerCase() + '.png'
+	};
+
+	if (mask) {
+		if (mask == 'Textbox Pinline') {
+			frame.masks = [
+				{
+					'src': '/img/frames/seventh/regular/trim.svg',
+					'name': 'Textbox Pinline'
+				}
+			]
+		} else {
+			frame.masks = [
+				{
+					'src': '/img/frames/seventh/regular/' + mask.toLowerCase() + '.svg',
+					'name': mask
+				}
+			]
+		}
+
+		if (maskToRightHalf) {
+			frame.masks.push({
+				'src': '/img/frames/maskRightHalf.png',
+				'name': 'Right Half'
+			});
+		}
+	} else {
+		frame.masks = [];
+	}
+
+	return frame;
 }
 async function addFrame(additionalMasks = [], loadingFrame = false) {
 	var frameToAdd = JSON.parse(JSON.stringify(availableFrames[selectedFrameIndex]));
@@ -795,6 +3282,7 @@ function hslToRGB(h, s, l){
 }
 //TEXT TAB
 var writingText;
+var autoFrameTimer;
 function loadTextOptions(textObject, replace=true) {
 	var oldCardText = card.text || {};
 	Object.entries(oldCardText).forEach(item => {
@@ -827,6 +3315,7 @@ function loadTextOptions(textObject, replace=true) {
 function textOptionClicked(event) {
 	selectedTextIndex = getElementIndex(event.target);
 	document.querySelector('#text-editor').value = Object.entries(card.text)[selectedTextIndex][1].text;
+	document.querySelector('#text-editor-font-size').value = Object.entries(card.text)[selectedTextIndex][1].fontSize;
 	selectSelectable(event);
 }
 function textboxEditor() {
@@ -844,10 +3333,19 @@ function textboxEditor() {
 function textEdited() {
 	card.text[Object.keys(card.text)[selectedTextIndex]].text = curlyQuotes(document.querySelector('#text-editor').value);
 	drawTextBuffer();
+	autoFrameBuffer();
+}
+function fontSizedEdited() {
+	card.text[Object.keys(card.text)[selectedTextIndex]].fontSize = document.querySelector('#text-editor-font-size').value;
+	drawTextBuffer();
 }
 function drawTextBuffer() {
 	clearTimeout(writingText);
 	writingText = setTimeout(drawText, 500);
+}
+function autoFrameBuffer() {
+	clearTimeout(autoFrameTimer);
+	autoFrameTimer = setTimeout(autoFrame, 500);
 }
 async function drawText() {
 	textContext.clearRect(0, 0, textCanvas.width, textCanvas.height);
@@ -866,6 +3364,7 @@ async function drawText() {
 		drawCard();
 	}
 }
+var justifyWidth = 90;
 function writeText(textObject, targetContext) {
 	//Most bits of info about text loaded, with defaults when needed
 	var textX = scaleX(textObject.x) || scaleX(0);
@@ -877,6 +3376,7 @@ function writeText(textObject, targetContext) {
 	var textBounded = textObject.bounded || true;
 	var textOneLine = textObject.oneLine || false;
 	var textManaCost = textObject.manaCost || false;
+	var textAllCaps = textObject.allCaps || false;
 	var textManaSpacing = scaleWidth(textObject.manaSpacing) || 0;
 	//Buffers the canvases accordingly
 	var canvasMargin = 300;
@@ -887,21 +3387,66 @@ function writeText(textObject, targetContext) {
 	//Preps the text string
 	var splitString = '6GJt7eL8';
 	var rawText = textObject.text
+	if (document.querySelector('#hide-reminder-text').checked && textObject.name && textObject.name != 'Title' && textObject.name != 'Type' && textObject.name != 'Mana Cost' && textObject.name != 'Power/Toughness') {
+		var rulesText = rawText;
+		var flavorText = '';
+		var flavorIndex = rawText.indexOf('{flavor}') || rawText.indexOf('///');
+		if (flavorIndex >= 0) {
+			flavorText = rawText.substring(flavorIndex);
+			rulesText = rawText.substring(0, flavorIndex);
+		}
+
+		rulesText = rulesText.replace(/ ?{i}\([^\)]+\){\/i}/g, '');
+
+		rawText = rulesText + flavorText;
+	}
+	if (textAllCaps) {
+		rawText = rawText.toUpperCase();
+	}
 	if ((textObject.name == 'wizards' || textObject.name == 'copyright') && params.get('copyright') != null && (params.get('copyright') != '' || card.margins)) {
 		rawText = params.get('copyright'); //so people using CC for custom card games without WotC's IP can customize their copyright info
 		if (rawText == 'none') { rawText = ''; }
 	}
-	if (rawText.toLowerCase().includes('{cardname}' || '~')) {
-		rawText = rawText.replace(/{cardname}|~/ig, getCardName());
+	if (rawText.toLowerCase().includes('{cardname}') || rawText.toLowerCase().includes('~')) {
+		rawText = rawText.replace(/{cardname}|~/ig, getInlineCardName());
 	}
 	if (document.querySelector('#info-artist').value == '') {
-		rawText = rawText.replace('\uFFEE{elemidinfo-artist}', '');
+		rawText = rawText.replace('\uFFEE{savex2}{elemidinfo-artist}', '');
 	}
-	var splitText = rawText.replace(/\n/g, '{line}').replace(/{-}/g, '\u2014').replace(/{divider}/g, '{lns}{bar}{lns}{fixtextalign}').replace(/{flavor}/g, '{lns}{bar}{lns}{fixtextalign}{i}').replace(/{/g, splitString + '{').replace(/}/g, '}' + splitString).replace(/ /g, splitString + ' ' + splitString).split(splitString);
+	if (rawText.includes('///')) {
+		rawText = rawText.replace(/\/\/\//g, '{flavor}');
+	}
+	if (rawText.includes('//')) {
+		rawText = rawText.replace(/\/\//g, '{lns}');
+	}
+
+	if (card.version == 'pokemon') {
+		rawText = rawText.replace(/{flavor}/g, '{oldflavor}{fontsize-20}{fontgillsansbolditalic}');
+	} else if (card.version == 'dossier') {
+		rawText = rawText.replace(/{flavor}(.*)/g, function(v) { return '{/indent}{lns}{bar}{lns}{fixtextalign}' + v.replace(/{flavor}/g, '').toUpperCase(); });
+	} else if (!card.showsFlavorBar) {
+		rawText = rawText.replace(/{flavor}/g, '{oldflavor}');
+	}
+
+	if (textObject.font == 'saloongirl') {
+		rawText = rawText.replace(/\*/g, '{fontbelerenbsc}*{fontsaloongirl}');
+	}
+	rawText = rawText.replace(/ - /g, ' — ');
+	var splitText = rawText.replace(/\n/g, '{line}').replace(/{-}/g, '\u2014').replace(/{divider}/g, '{/indent}{lns}{bar}{lns}{fixtextalign}');
+	if (rawText.trim().startsWith('{flavor}') || rawText.trim().startsWith('{oldflavor}')) {
+		splitText = splitText.replace(/{flavor}/g, '{i}').replace(/{oldflavor}/g, '{i}');
+	} else {
+		splitText = splitText.replace(/{flavor}/g, '{/indent}{lns}{bar}{lns}{fixtextalign}{i}').replace(/{oldflavor}/g, '{/indent}{lns}{lns}{up30}{i}');
+	}
+	splitText = splitText.replace(/{/g, splitString + '{').replace(/}/g, '}' + splitString).replace(/ /g, splitString + ' ' + splitString).split(splitString);
+
 	splitText = splitText.filter(item => item);
+	if (textObject.manaCost) {
+		splitText = splitText.filter(item => item != ' ');
+	}
 	if (textObject.vertical) {
 		newSplitText = [];
-		splitText.forEach(item => {
+		splitText.forEach((item, index) => {
 			if (item.includes('{') && item.includes('}')) {
 				newSplitText.push(item);
 			} else if (item == ' ') {
@@ -910,6 +3455,8 @@ function writeText(textObject, targetContext) {
 				item.split('').forEach(char => {
 					if (char == '’') {
 						newSplitText.push(`{right${startingTextSize * 0.6}}`, '’', '{lns}', `{up${startingTextSize * 0.75}}`);
+					} else if (textManaCost && index == splitText.length-1) {
+						newSplitText.push(char);
 					} else {
 						newSplitText.push(char, '{lns}');
 					}
@@ -922,9 +3469,6 @@ function writeText(textObject, targetContext) {
 	// if (textManaCost && textObject.arcStart > 0) {
 	// 	splitText.reverse();
 	// }
-	if (textObject.manaCost) {
-		splitText = splitText.filter(item => item != ' ');
-	}
 	splitText.push('');
 	//Manages the redraw loop
 	var drawingText = true;
@@ -970,13 +3514,15 @@ function writeText(textObject, targetContext) {
 		var newLineSpacing = (textObject.lineSpacing || 0) * textSize;
 		var ptShift = [0, 0];
 		var permaShift = [0, 0];
+		var fillJustify = false;
 		//Finish prepping canvases
 		paragraphContext.clearRect(0, 0, paragraphCanvas.width, paragraphCanvas.height);
 		lineContext.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
-		lineCanvas.style.letterSpacing = (scaleWidth(textObject.kerning) || 0) + 'px';
+		lineContext.letterSpacing = (scaleWidth(textObject.kerning) || 0) + 'px';
 		// if (textFont == 'goudymedieval') {
 		// 	lineCanvas.style.letterSpacing = '3.5px';
 		// }
+		textSize += parseInt(textObject.fontSize || '0');
 		lineContext.font = textFontStyle + textSize + 'px ' + textFont + textFontExtension;
 		lineContext.fillStyle = textColor;
 		lineContext.shadowColor = textShadowColor;
@@ -985,6 +3531,11 @@ function writeText(textObject, targetContext) {
 		lineContext.shadowBlur = textShadowBlur;
 		lineContext.strokeStyle = textObject.outlineColor || 'black';
 		var textOutlineWidth = scaleHeight(textObject.outlineWidth) || 0;
+
+		var hideBottomInfoBorder = card.hideBottomInfoBorder || false;
+		if (hideBottomInfoBorder && ['midLeft', 'topLeft', 'note', 'bottomLeft', 'wizards', 'bottomRight', 'rarity'].includes(textObject.name)) {
+			textOutlineWidth = 0;
+		}
 		lineContext.lineWidth = textOutlineWidth;
 		//Begin looping through words/codes
 		innerloop: for (word of splitText) {
@@ -999,15 +3550,12 @@ function writeText(textObject, targetContext) {
 				} else if (possibleCode == 'lns' || possibleCode == 'linenospace') {
 					newLine = true;
 				} else if (possibleCode == 'bar') {
-					var barWidth = textWidth * 0.95;
-					var barHeight = scaleHeight(0.002);
+					var barWidth = textWidth * 0.96;
+					var barHeight = scaleHeight(0.03);
 					var barImageName = 'bar';
-					var barDistance = 0.45;
+					var barDistance = 0;
 					realTextAlign = textAlign;
 					textAlign = 'left';
-					if (textColor == 'white') {
-						barImageName = 'whitebar';
-					}
 					if (card.version == 'cartoony') {
 						barImageName = 'cflavor';
 						barWidth = scaleWidth(0.8547);
@@ -1018,7 +3566,9 @@ function writeText(textObject, targetContext) {
 					}
 					lineContext.drawImage(getManaSymbol(barImageName).image, canvasMargin + (textWidth - barWidth) / 2, canvasMargin + barDistance * textSize, barWidth, barHeight);
 				} else if (possibleCode == 'i') {
-					if (textFont == 'mplantin') {
+					if (textFont == 'gilllsans' || textFont == 'neosans') {
+						textFontExtension = 'italic';
+					} else if (textFont == 'mplantin') {
 						textFontExtension = 'i';
 						textFontStyle = textFontStyle.replace('italic ', '');
 					} else {
@@ -1031,10 +3581,18 @@ function writeText(textObject, targetContext) {
 					textFontStyle = textFontStyle.replace('italic ', '');
 					lineContext.font = textFontStyle + textSize + 'px ' + textFont + textFontExtension;
 				} else if (possibleCode == 'bold') {
-					if (!textFontStyle.includes('bold')) {textFontStyle += 'bold ';}
+					if (textFont == 'gillsans') {
+						textFontExtension = 'bold';
+					} else {
+						if (!textFontStyle.includes('bold')) {textFontStyle += 'bold ';}
+					}
 					lineContext.font = textFontStyle + textSize + 'px ' + textFont + textFontExtension;
 				} else if (possibleCode == '/bold') {
-					textFontStyle = textFontStyle.replace('bold ', '');
+					if (textFont == 'gillsans') {
+						textFontExtension = '';
+					} else {
+						textFontStyle = textFontStyle.replace('bold ', '');
+					}
 					lineContext.font = textFontStyle + textSize + 'px ' + textFont + textFontExtension;
 				} else if (possibleCode == 'left') {
 					textAlign = 'left';
@@ -1118,17 +3676,31 @@ function writeText(textObject, targetContext) {
 					startingCurrentX += planechaseHeight * 1.3;
 				} else if (possibleCode == 'indent') {
 					startingCurrentX += currentX;
+					currentY -= 10;
 				} else if (possibleCode == '/indent') {
 					startingCurrentX = 0;
 				} else if (possibleCode.includes('elemid')) {
 					if (document.querySelector('#' + word.replace('{elemid', '').replace('}', ''))) {
 						wordToWrite = document.querySelector('#' + word.replace('{elemid', '').replace('}', '')).value || '';
 					}
+					if (word.includes('set')) {
+						var bottomTextSubstring = card.bottomInfo.midLeft.text.substring(0, card.bottomInfo.midLeft.text.indexOf('  {savex}')).replace('{elemidinfo-set}', document.querySelector('#info-set').value || '').replace('{elemidinfo-language}', document.querySelector('#info-language').value || '');
+						justifyWidth = lineContext.measureText(bottomTextSubstring).width;
+					} else if (word.includes('number') && wordToWrite.includes('/') && card.version != 'pokemon') {
+						fillJustify = true;
+						wordToWrite = Array.from(wordToWrite).join(' ');
+					}
 				} else if (possibleCode == 'savex') {
 					savedTextXPosition = currentX;
 				} else if (possibleCode == 'loadx') {
 					if (savedTextXPosition > currentX) {
 						currentX = savedTextXPosition;
+					}
+				} else if (possibleCode == 'savex2') {
+					savedTextXPosition2 = currentX;
+				} else if (possibleCode == 'loadx2') {
+					if (savedTextXPosition2 > currentX) {
+						currentX = savedTextXPosition2;
 					}
 				} else if (possibleCode.includes('ptshift')) {
 					if (card.frames.findIndex(element => element.name.toLowerCase().includes('power/toughness')) >= 0 || card.version.includes('planeswalker') || ['commanderLegends', 'm21', 'mysticalArchive', 'customDualLands', 'feuerAmeiseKaldheim'].includes(card.version)) {
@@ -1164,16 +3736,22 @@ function writeText(textObject, targetContext) {
 				} else if (possibleCode.includes('fixtextalign')) {
 					textAlign = realTextAlign;
 				} else if (possibleCode.includes('kerning')) {
-					lineCanvas.style.letterSpacing = possibleCode.replace('kerning', '') + 'px';
+					lineContext.letterSpacing = possibleCode.replace('kerning', '') + 'px';
 					lineContext.font = lineContext.font; //necessary for the letterspacing update to be recognized
-				} else if (getManaSymbol(possibleCode.replace('/', '')) != undefined || getManaSymbol(possibleCode.replace('/', '').split('').reverse().join('')) != undefined) {
-					possibleCode = possibleCode.replace('/', '')
+				} else if (getManaSymbol(possibleCode.replaceAll('/', '')) != undefined || getManaSymbol(possibleCode.replaceAll('/', '').split('').reverse().join('')) != undefined) {
+					possibleCode = possibleCode.replaceAll('/', '')
 					var manaSymbol;
 					if (textObject.manaPrefix && (getManaSymbol(textObject.manaPrefix + possibleCode) != undefined || getManaSymbol(textObject.manaPrefix + possibleCode.split('').reverse().join('')) != undefined)) {
 						manaSymbol = getManaSymbol(textObject.manaPrefix + possibleCode) || getManaSymbol(textObject.manaPrefix + possibleCode.split('').reverse().join(''));
 					} else {
 						manaSymbol = getManaSymbol(possibleCode) || getManaSymbol(possibleCode.split('').reverse().join(''));
 					}
+
+					var origManaSymbolColor = manaSymbolColor;
+					if (manaSymbol.matchColor && !manaSymbolColor && textColor !== 'black') {
+						manaSymbolColor = textColor;
+					}
+
 					var manaSymbolSpacing = textSize * 0.04 + textManaSpacing;
 					var manaSymbolWidth = manaSymbol.width * textSize * 0.78;
 					var manaSymbolHeight = manaSymbol.height * textSize * 0.78;
@@ -1234,10 +3812,17 @@ function writeText(textObject, targetContext) {
 					lineContext.drawImage(fakeShadow, 0, 0);
 					//fake shadow ends (thanks, safari)
 					currentX += manaSymbolWidth + manaSymbolSpacing * 2;
+
+					manaSymbolColor = origManaSymbolColor;
 				} else {
 					wordToWrite = word;
 				}
 			}
+
+			if (wordToWrite && lineContext.font.endsWith('belerenb')) {
+				wordToWrite = wordToWrite.replace(/f(?:\s|$)/g, '\ue006').replace(/h(?:\s|$)/g, '\ue007').replace(/m(?:\s|$)/g, '\ue008').replace(/n(?:\s|$)/g, '\ue009').replace(/k(?:\s|$)/g, '\ue00a');
+			}
+
 			//if the word goes past the max line width, go to the next line
 			if (wordToWrite && lineContext.measureText(wordToWrite).width + currentX >= textWidth && textArcRadius == 0) {
 				if (textOneLine && startingTextSize > 1) {
@@ -1283,15 +3868,33 @@ function writeText(textObject, targetContext) {
 			}
 			//if there's a word to write, it's not a space on a new line, and it's allowed to write words, then we write the word
 			if (wordToWrite && (currentX != startingCurrentX || wordToWrite != ' ') && !textManaCost) {
+				var justifySettings = {
+					maxSpaceSize: 6,
+					minSpaceSize: 0
+				};
+
 				if (textArcRadius > 0) {
 					lineContext.fillTextArc(wordToWrite, currentX + canvasMargin, canvasMargin + textSize * textFontHeightRatio + lineY, textArcRadius, textArcStart, currentX, textOutlineWidth);
 				} else {
 					if (textOutlineWidth >= 1) {
-						lineContext.strokeText(wordToWrite, currentX + canvasMargin, canvasMargin + textSize * textFontHeightRatio + lineY);
+						if (fillJustify) {
+							lineContext.strokeJustifyText(wordToWrite, currentX + canvasMargin, canvasMargin + textSize * textFontHeightRatio + lineY, justifyWidth, justifySettings);
+						} else {
+							lineContext.strokeText(wordToWrite, currentX + canvasMargin, canvasMargin + textSize * textFontHeightRatio + lineY);
+						}
 					}
-					lineContext.fillText(wordToWrite, currentX + canvasMargin, canvasMargin + textSize * textFontHeightRatio + lineY);
+					if (fillJustify) {
+						lineContext.fillJustifyText(wordToWrite, currentX + canvasMargin, canvasMargin + textSize * textFontHeightRatio + lineY, justifyWidth, justifySettings);
+					} else {
+						lineContext.fillText(wordToWrite, currentX + canvasMargin, canvasMargin + textSize * textFontHeightRatio + lineY);
+					}
 				}
-				currentX += lineContext.measureText(wordToWrite).width;
+
+				if (fillJustify) {
+					currentX += lineContext.measureJustifiedText(wordToWrite, justifyWidth, justifySettings);
+				} else {
+					currentX += lineContext.measureText(wordToWrite).width;
+				}
 			}
 			if (currentY > textHeight && textBounded && !textOneLine && startingTextSize > 1 && textArcRadius == 0) {
 				//doesn't fit... try again at a smaller text size?
@@ -1370,6 +3973,97 @@ CanvasRenderingContext2D.prototype.fillImage = function(image, x, y, width, heig
 	context.fillRect(0, 0, width + margin * 2, height + margin * 2);
 	this.drawImage(canvas, x - margin, y - margin, width + margin * 2, height + margin * 2);
 }
+
+const FILL = 0; //const to indicate filltext render
+const STROKE = 1;
+const MEASURE = 2;
+var maxSpaceSize = 3; // Multiplier for max space size. If greater then no justification applied
+var minSpaceSize = 0.5; // Multiplier for minimum space size
+function renderTextJustified(ctx, text, x, y, width, renderType) {
+	var splitChar = " ";
+
+	var words, wordsWidth, count, spaces, spaceWidth, adjSpace, renderer, i, textAlign, useSize, totalWidth;
+	textAlign = ctx.textAlign;
+	ctx.textAlign = "left";
+	wordsWidth = 0;
+	words = text.split(splitChar).map(word => {
+		var w = ctx.measureText(word).width;
+		wordsWidth += w;
+		return {
+			width: w,
+			word: word
+		};
+	});
+	// count = num words, spaces = number spaces, spaceWidth normal space size
+	// adjSpace new space size >= min size. useSize Reslting space size used to render
+	count = words.length;
+	spaces = count - 1;
+	spaceWidth = ctx.measureText(splitChar).width;
+	adjSpace = Math.max(spaceWidth * minSpaceSize, (width - wordsWidth) / spaces);
+	useSize = adjSpace > spaceWidth * maxSpaceSize ? spaceWidth : adjSpace;
+	totalWidth = wordsWidth + useSize * spaces;
+	if (renderType === MEASURE) { // if measuring return size
+		ctx.textAlign = textAlign;
+		return totalWidth;
+	}
+	renderer = renderType === FILL ? ctx.fillText.bind(ctx) : ctx.strokeText.bind(ctx); // fill or stroke
+	switch(textAlign) {
+	case "right":
+		x -= totalWidth;
+		break;
+	case "end":
+		x += width - totalWidth;
+		break;
+	case "center": // intentional fall through to default
+		x -= totalWidth / 2;
+	default:
+	}
+	if (useSize === spaceWidth) { // if space size unchanged
+		renderer(text, x, y);
+	} else {
+		for(i = 0; i < count; i += 1) {
+			renderer(words[i].word,x,y);
+			x += words[i].width;
+			x += useSize;
+		}
+	}
+	ctx.textAlign = textAlign;
+}
+
+// Parse vet and set settings object.
+function justifiedTextSettings(settings) {
+	var min,max;
+	var vetNumber = (num, defaultNum) => {
+		num = num !== null && num !== null && !isNaN(num) ? num : defaultNum;
+		if(num < 0){
+			num = defaultNum;
+		}
+		return num;
+	}
+	if(settings === undefined || settings === null){
+		return;
+	}
+	max = vetNumber(settings.maxSpaceSize, maxSpaceSize);
+	min = vetNumber(settings.minSpaceSize, minSpaceSize);
+	if(min > max){
+		return;
+	}
+	minSpaceSize = min;
+	maxSpaceSize = max;
+}
+CanvasRenderingContext2D.prototype.fillJustifyText = function(text, x, y, width, settings) {
+	justifiedTextSettings(settings);
+	renderTextJustified(this, text, x, y, width, FILL);
+}
+CanvasRenderingContext2D.prototype.strokeJustifyText = function(text, x, y, width, settings){
+	justifiedTextSettings(settings);
+	renderTextJustified(this, text, x, y, width, STROKE);
+}
+CanvasRenderingContext2D.prototype.measureJustifiedText = function(text, width, settings) {
+	justifiedTextSettings(settings);
+	renderTextJustified(this, text, 0, 0, width, MEASURE);
+}
+
 function widthToAngle(width, radius) {
 	return width / radius;
 }
@@ -1424,6 +4118,23 @@ function autoFitArt() {
 	}
 	artEdited();
 }
+
+function centerArtX() {
+	document.querySelector('#art-rotate').value = 0;
+	if (art.width / art.height > scaleWidth(card.artBounds.width) / scaleHeight(card.artBounds.height)) {
+		document.querySelector('#art-x').value = Math.round(scaleX(card.artBounds.x) - (document.querySelector('#art-zoom').value / 100 * art.width - scaleWidth(card.artBounds.width)) / 2 - scaleWidth(card.marginX));
+	} else {
+		document.querySelector('#art-x').value = Math.round(scaleX(card.artBounds.x) - scaleWidth(card.marginX));
+	}
+	artEdited();
+}
+
+function centerArtY() {
+	document.querySelector('#art-rotate').value = 0;
+	document.querySelector('#art-y').value = Math.round(scaleY(card.artBounds.y) - (document.querySelector('#art-zoom').value / 100 * art.height - scaleHeight(card.artBounds.height)) / 2 - scaleHeight(card.marginY));
+	artEdited();
+}
+
 function artFromScryfall(scryfallResponse) {
 	scryfallArt = []
 	const artIndex = document.querySelector('#art-index');
@@ -1439,6 +4150,27 @@ function artFromScryfall(scryfallResponse) {
 			optionIndex ++;
 		}
 	});
+
+	if (document.querySelector('#importAllPrints').checked) {
+		// If importing unique prints, the art should change to match the unique print selected.
+
+		// First we find the illustration ID of the imported print
+		var illustrationID = scryfallCard[document.querySelector('#import-index').value].illustration_id;
+
+		// Find all unique arts for that card
+		var artIllustrations = scryfallArt.map(card => card.illustration_id);
+
+		// Find the art that matches the selected print
+		var index = artIllustrations.indexOf(illustrationID);
+		if (index < 0) {
+			// Couldn't find art
+			index = 0;
+		}
+
+		// Use that art
+		artIndex.value = index;
+	}
+
 	changeArtIndex();
 }
 function changeArtIndex() {
@@ -1511,7 +4243,7 @@ function artDrag(e) {
 			startY = endY;
 			artEdited();
 		}
-		
+
 	}
 }
 function artStopDrag(e) {
@@ -1536,6 +4268,7 @@ function setSymbolEdited() {
 	if (document.querySelector('#lockSetSymbolURL').checked) {
 		localStorage.setItem('lockSetSymbolURL', card.setSymbolSource);
 	}
+	localStorage.setItem('set-symbol-source', document.querySelector('#set-symbol-source').value);
 	card.setSymbolX = document.querySelector('#setSymbol-x').value / card.width;
 	card.setSymbolY = document.querySelector('#setSymbol-y').value / card.height;
 	card.setSymbolZoom = document.querySelector('#setSymbol-zoom').value / 100;
@@ -1572,12 +4305,23 @@ function fetchSetSymbol() {
 		localStorage.setItem('lockSetSymbolCode', setCode);
 	}
 	var setRarity = document.querySelector('#set-symbol-rarity').value.toLowerCase().replace('uncommon', 'u').replace('common', 'c').replace('rare', 'r').replace('mythic', 'm') || 'c';
-	if (['cc', 'logan', 'joe'].includes(setCode.toLowerCase())) {
+	if (['sld', 'a22', 'a23', 'j22'].includes(setCode.toLowerCase())) {
+		uploadSetSymbol(fixUri(`/img/setSymbols/custom/${setCode.toLowerCase()}-${setRarity}.png`), 'resetSetSymbol');
+	} else if (['cc', 'logan', 'joe'].includes(setCode.toLowerCase())) {
 		uploadSetSymbol(fixUri(`/img/setSymbols/custom/${setCode.toLowerCase()}-${setRarity}.svg`), 'resetSetSymbol');
-	} else {
+	} else if (document.querySelector("#set-symbol-source").value == 'gatherer') {
 		if (setSymbolAliases.has(setCode.toLowerCase())) setCode = setSymbolAliases.get(setCode.toLowerCase());
-		uploadSetSymbol(fixUri(`/img/setSymbols/official/${setCode.toLowerCase()}-${setRarity}.svg`), 'resetSetSymbol');
-		//imageURL('http://gatherer.wizards.com/Handlers/Image.ashx?type=symbol&set=' + setCode + '&size=large&rarity=' + setRarity, uploadSetSymbol, 'resetSetSymbol');
+		uploadSetSymbol('http://gatherer.wizards.com/Handlers/Image.ashx?type=symbol&set=' + setCode + '&size=large&rarity=' + setRarity, 'resetSetSymbol');
+	} else if (document.querySelector("#set-symbol-source").value == 'hexproof') {
+		if (setSymbolAliases.has(setCode.toLowerCase())) setCode = setSymbolAliases.get(setCode.toLowerCase());
+		uploadSetSymbol('https://api.hexproof.io/symbols/set/' + setCode + '/' + setRarity, 'resetSetSymbol');
+	} else {
+		var extension = 'svg';
+		if (['moc', 'ltr', 'ltc', 'cmm', 'who', 'scd', 'woe', 'wot', 'woc', 'lci', 'lcc', 'mkm', 'mkc', 'otj', 'otc'].includes(setCode.toLowerCase())) {
+			extension = 'png';
+		}
+		if (setSymbolAliases.has(setCode.toLowerCase())) setCode = setSymbolAliases.get(setCode.toLowerCase());
+		uploadSetSymbol(fixUri(`/img/setSymbols/official/${setCode.toLowerCase()}-${setRarity}.` + extension), 'resetSetSymbol');
 	}
 }
 function lockSetSymbolCode() {
@@ -1702,16 +4446,44 @@ async function bottomInfoEdited() {
 	card.infoLanguage = document.querySelector('#info-language').value;
 	card.infoArtist = document.querySelector('#info-artist').value;
 	card.infoYear = document.querySelector('#info-year').value;
-	for (var textObject of Object.entries(card.bottomInfo)) {
-		if (["NOT FOR SALE", "Wizards of the Coast", "CardConjurer.com", "cardconjurer.com"].some(v => textObject[1].text.includes(v))) {
+	card.infoNote = document.querySelector('#info-note').value;
+
+	if (document.querySelector('#enableCollectorInfo').checked) {
+		for (var textObject of Object.entries(card.bottomInfo)) {
+			if (["NOT FOR SALE", "Wizards of the Coast", "CardConjurer.com", "cardconjurer.com"].some(v => textObject[1].text.includes(v))) {
+				continue;
+			} else {
+				textObject[1].name = textObject[0];
+				await writeText(textObject[1], bottomInfoContext);
+			}
 			continue;
-		} else {
-			await writeText(textObject[1], bottomInfoContext);
 		}
-		continue;
 	}
+
 	drawCard();
 }
+async function serialInfoEdited() {
+	card.serialNumber = document.querySelector('#serial-number').value;
+	card.serialTotal = document.querySelector('#serial-total').value;
+	card.serialX = document.querySelector('#serial-x').value;
+	card.serialY = document.querySelector('#serial-y').value;
+	card.serialScale = document.querySelector('#serial-scale').value;
+
+	drawCard();
+}
+
+async function resetSerial() {
+	card.serialX = scaleX(172/2010);
+	card.serialY = scaleY(1383/2814);
+	card.serialScale = 1.0;
+
+	document.querySelector('#serial-x').value = card.serialX;
+	document.querySelector('#serial-y').value = card.serialY;
+	document.querySelector('#serial-scale').value = card.serialScale;
+
+	drawCard();
+}
+
 function artistEdited(value) {
 	document.querySelector('#art-artist').value = value;
 	document.querySelector('#info-artist').value = value;
@@ -1729,8 +4501,31 @@ function toggleStarDot() {
 	defaultCollector.starDot = !defaultCollector.starDot;
 	bottomInfoEdited();
 }
+function enableNewCollectorInfoStyle() {
+	localStorage.setItem('enableNewCollectorStyle', document.querySelector('#enableNewCollectorStyle').checked);
+	setBottomInfoStyle();
+	bottomInfoEdited();
+}
+function enableCollectorInfo() {
+	localStorage.setItem('enableCollectorInfo', document.querySelector('#enableCollectorInfo').checked);
+	bottomInfoEdited();
+}
 function enableImportCollectorInfo() {
 	localStorage.setItem('enableImportCollectorInfo', document.querySelector('#enableImportCollectorInfo').checked);
+}
+function setAutoFrame() {
+	var value = document.querySelector('#autoFrame').value;
+	localStorage.setItem('autoFrame', value);
+
+	if (value !== 'false') {
+		document.querySelector('#autoLoadFrameVersion').checked = true;
+		localStorage.setItem('autoLoadFrameVersion', 'true');
+	}
+
+	autoFrame();
+}
+function setAutofit() {
+	localStorage.setItem('autoFit', document.querySelector('#art-update-autofit').checked);
 }
 function removeDefaultCollector() {
 	defaultCollector = {}; //{number: year, rarity:'P', setCode:'MTG', lang:'EN', starDot:false};
@@ -1743,6 +4538,7 @@ function setDefaultCollector() {
 		rarity: document.querySelector('#info-rarity').value,
 		setCode: document.querySelector('#info-set').value,
 		lang: document.querySelector('#info-language').value,
+		note: document.querySelector('#info-note').value,
 		starDot: starDot
 	};
 	localStorage.setItem('defaultCollector', JSON.stringify(defaultCollector));
@@ -1756,6 +4552,9 @@ function drawCard() {
 	cardContext.save();
 	cardContext.translate(scaleX(card.artX), scaleY(card.artY));
 	cardContext.rotate(Math.PI / 180 * (card.artRotate || 0));
+	if (document.querySelector('#grayscale-art').checked) {
+		cardContext.filter='grayscale(1)';
+	}
 	cardContext.drawImage(art, 0, 0, art.width * card.artZoom, art.height * card.artZoom);
 	cardContext.restore();
 	// frame elements
@@ -1788,18 +4587,69 @@ function drawCard() {
 	cardContext.drawImage(textCanvas, 0, 0, cardCanvas.width, cardCanvas.height);
 	// set symbol
 	cardContext.drawImage(setSymbol, scaleX(card.setSymbolX), scaleY(card.setSymbolY), setSymbol.width * card.setSymbolZoom, setSymbol.height * card.setSymbolZoom)
+	// serial
+	if (card.serialNumber || card.serialTotal) {
+		var x = parseInt(card.serialX) || 172;
+		var y = parseInt(card.serialY) || 1383;
+		var scale = parseFloat(card.serialScale) || 1.0;
+
+		cardContext.drawImage(serial, scaleX(x/2010), scaleY(y/2814), scaleX(464/2010) * scale, scaleY(143/2814) * scale);
+
+		var number = {
+			name:"Number",
+			text: '{kerning3}' + card.serialNumber || '',
+			x: (x+(30 * scale))/2010,
+			y: (y+(52 * scale))/2814,
+			width: (190 * scale)/2010,
+			height: (55 * scale)/2814,
+			oneLine: true,
+			font: 'gothambold',
+			color: 'white',
+			size: (55 * scale)/2010,
+			align: 'center'
+		};
+
+		var total = {
+			name:"Number",
+			text: '{kerning3}' + card.serialTotal || '',
+			x: (x+(251 * scale))/2010,
+			y: (y+(52 * scale))/2814,
+			width: (190 * scale)/2010,
+			height: (55 * scale)/2814,
+			oneLine: true,
+			font: 'gothambold',
+			color: 'white',
+			size: (55 * scale)/2010,
+			align: 'center'
+		};
+
+		writeText(number, cardContext);
+		writeText(total, cardContext);
+	}
 	// bottom info
-	cardContext.drawImage(bottomInfoCanvas, 0, 0, cardCanvas.width, cardCanvas.height);
+	if (card.bottomInfoTranslate) {
+		cardContext.save();
+		cardContext.rotate(Math.PI / 180 * (card.bottomInfoRotate || 0));
+		cardContext.translate(card.bottomInfoTranslate.x || 0, card.bottomInfoTranslate.y || 0);
+		cardContext.drawImage(bottomInfoCanvas, 0, 0, cardCanvas.width * (card.bottomInfoZoom || 1), cardCanvas.height * (card.bottomInfoZoom || 1));
+		cardContext.restore();
+	} else {
+		cardContext.drawImage(bottomInfoCanvas, 0, 0, cardCanvas.width, cardCanvas.height);
+	}
+	
+	
 	// cutout the corners
 	cardContext.globalCompositeOperation = 'destination-out';
 	if (!card.noCorners && (card.marginX == 0 && card.marginY == 0)) {
-		cardContext.drawImage(corner, 0, 0, scaleWidth(59/1500), scaleWidth(59/1500));
+		var w = card.version == 'battle' ? 2100 : getStandardWidth();
+
+		cardContext.drawImage(corner, 0, 0, scaleWidth(59/w), scaleWidth(59/w));
 		cardContext.rotate(Math.PI / 2);
-		cardContext.drawImage(corner, 0, -card.width, scaleWidth(59/1500), scaleWidth(59/1500));
+		cardContext.drawImage(corner, 0, -card.width, scaleWidth(59/w), scaleWidth(59/w));
 		cardContext.rotate(Math.PI / 2);
-		cardContext.drawImage(corner, -card.width, -card.height, scaleWidth(59/1500), scaleWidth(59/1500));
+		cardContext.drawImage(corner, -card.width, -card.height, scaleWidth(59/w), scaleWidth(59/w));
 		cardContext.rotate(Math.PI / 2);
-		cardContext.drawImage(corner, -card.height, 0, scaleWidth(59/1500), scaleWidth(59/1500));
+		cardContext.drawImage(corner, -card.height, 0, scaleWidth(59/w), scaleWidth(59/w));
 		cardContext.rotate(Math.PI / 2);
 	}
 	// show preview
@@ -1807,13 +4657,20 @@ function drawCard() {
 	previewContext.drawImage(cardCanvas, 0, 0, previewCanvas.width, previewCanvas.height);
 }
 //DOWNLOADING
-function downloadCard(alt = false) {
+function downloadCard(alt = false, jpeg = false) {
 	if (card.infoArtist.replace(/ /g, '') == '' && !card.artSource.includes('/img/blank.png') && !card.artZoom == 0) {
 		notify('You must credit an artist before downloading!', 5);
 	} else {
 		// Prep file information
-		const imageDataURL = cardCanvas.toDataURL('image/png');
-		var imageName = getCardName() + '.png';
+		var imageDataURL;
+		var imageName = getCardName();
+		if (jpeg) {
+			imageDataURL = cardCanvas.toDataURL('image/jpeg', 0.8);
+			imageName = imageName + '.jpeg';
+		} else {
+			imageDataURL = cardCanvas.toDataURL('image/png');
+			imageName = imageName + '.png';
+		}
 		// Download image
 		if (alt) {
 			const newWindow = window.open('about:blank');
@@ -1843,7 +4700,13 @@ function importCard(cardObject) {
 	cardObject.forEach(card => {
 		if (card.type_line && card.type_line != 'Card') {
 			var option = document.createElement('option');
-			option.innerHTML = `${card.name} (${card.type_line})`;
+			var title = `${card.name} `;
+			if (document.querySelector('#importAllPrints').checked) {
+				title += `(${card.set.toUpperCase()} #${card.collector_number})`;
+			} else {
+				title += `(${card.type_line})`
+			}
+			option.innerHTML = title;
 			option.value = optionIndex;
 			importIndex.appendChild(option);
 		}
@@ -1851,18 +4714,135 @@ function importCard(cardObject) {
 	});
 	changeCardIndex();
 }
+
+function scryfallCardFromText(text) {
+	var lines = text.trim().split("\n");
+
+	if (lines.count == 0) {
+  		return {};
+	}
+
+	lines = lines.map(item => item.trim()).filter(item => item != "");
+  
+  	var name = lines.shift();
+  	var manaCost;
+  	var manaCostStartIndex = name.indexOf("{");
+  	if (manaCostStartIndex > 0) {
+  	  manaCost = name.substring(manaCostStartIndex).trim();
+  	  name = name.substring(0, manaCostStartIndex).trim();
+  	}
+  
+ 	 var cardObject = {
+ 	   "name": name,
+ 	   "lang": "en"
+ 	 };
+  	
+ 	 if (manaCost !== undefined) {
+  	  cardObject.mana_cost = manaCost;
+ 	 }
+  	
+  	if (lines.count == 0) {
+  	  return cardObject;
+  	}
+  	
+ 	 cardObject.type_line = lines.shift().trim();
+  
+  if (lines.count == 0) {
+    return cardObject;
+  }
+  
+  var regex = /[0-9+\-*]+\/[0-9+*]+/
+  var match = lines[lines.length-1].match(regex);
+  if (match) {
+    var pt = match[0].split("/");
+    cardObject.power = pt[0];
+    cardObject.toughness = pt[1];
+    lines.pop();
+  }
+  
+  if (lines.count == 0) {
+    return cardObject;
+  }
+  
+  cardObject.oracle_text = lines.join("\n");
+  
+  return cardObject;
+}
+
 function changeCardIndex() {
 	var cardToImport = scryfallCard[document.querySelector('#import-index').value];
 	//text
 	var langFontCode = "";
 	if (cardToImport.lang == "ph") {langFontCode = "{fontphyrexian}"}
-	if (card.text.title) {card.text.title.text = langFontCode + curlyQuotes(cardToImport.name || '');}
+	var name = cardToImport.name || '';
+	if (name.startsWith('A-')) { name = name.replace('A-', '{alchemy}'); }
+
+	if (card.text.title) {
+		if (card.version == 'wanted') {
+			var subtitle = '';
+			var index = name.indexOf(', ');
+
+			if (index > 0) {
+			  card.text.subtitle.text = langFontCode + curlyQuotes(name.substring(index+2));
+			  card.text.title.text = langFontCode + curlyQuotes(name.substring(0, index+1));
+			} else {
+				card.text.title.text = langFontCode + curlyQuotes(name);
+				card.text.subtitle.text = '';
+			}
+		} else {
+			card.text.title.text = langFontCode + curlyQuotes(name);
+		}
+	}
+
 	if (card.text.nickname) {card.text.nickname.text = cardToImport.flavor_name || '';}
 	if (card.text.mana) {card.text.mana.text = cardToImport.mana_cost || '';}
 	if (card.text.type) {card.text.type.text = langFontCode + cardToImport.type_line || '';}
+
+	var italicExemptions = ['Boast', 'Cycling', 'Visit', 'Prize', 'I', 'II', 'III', 'IV', 'I, II', 'II, III', 'III, IV', 'I, II, III', 'II, III, IV', 'I, II, III, IV', '• Khans', '• Dragons', '• Mirran', '• Phyrexian', 'Prototype', 'Companion', 'To solve', 'Solved'];
+	var rulesText = (cardToImport.oracle_text || '').replace(/(?:\((?:.*?)\)|[^"\n]+(?= — ))/g, function(a){
+	    if (italicExemptions.includes(a) || (cardToImport.keywords && cardToImport.keywords.indexOf('Spree') != -1 && a.startsWith('+'))) {return a;}
+	    return '{i}' + a + '{/i}';
+	});
+	rulesText = curlyQuotes(rulesText).replace(/{Q}/g, '{untap}').replace(/{\u221E}/g, "{inf}").replace(/• /g, '• {indent}');
+	rulesText = rulesText.replace('(If this card is your chosen companion, you may put it into your hand from outside the game for {3} any time you could cast a sorcery.)', '(If this card is your chosen companion, you may put it into your hand from outside the game for {3} as a sorcery.)')
+
 	if (card.text.rules) {
-		var rulesText = curlyQuotes((cardToImport.oracle_text || '').replace('(', '{i}(').replace(')', '){/i}')).replace(/{Q}/g, '{untap}').replace(/{\u221E}/g, "{inf}").replace(/• /g, '• {indent}');
-		card.text.rules.text = langFontCode + rulesText;
+		if (card.version == 'pokemon') {
+			if (cardToImport.type_line.toLowerCase().includes('creature')) {
+				card.text.rules.text = langFontCode + rulesText;
+				card.text.rulesnoncreature.text = '';
+
+				card.text.middleStatTitle.text = 'power';
+				card.text.rightStatTitle.text = 'toughness';
+
+			} else if (cardToImport.type_line.toLowerCase().includes('planeswalker')) {
+				card.text.rules.text = langFontCode + rulesText;
+				card.text.rulesnoncreature.text = '';
+
+				card.text.pt.text = '{' + (cardToImport.loyalty || '' + '}');
+
+				card.text.middleStatTitle.text = '';
+				card.text.rightStatTitle.text = 'loyalty';
+			} else if (cardToImport.type_line.toLowerCase().includes('battle')) {
+				card.text.rules.text = langFontCode + rulesText;
+				card.text.rulesnoncreature.text = '';
+
+				card.text.pt.text = '{' + (cardToImport.defense || '' + '}');
+
+				card.text.middleStatTitle.text = '';
+				card.text.rightStatTitle.text = 'defense';
+			} else {
+				card.text.rulesnoncreature.text = langFontCode + rulesText;
+				card.text.rules.text = '';
+
+				card.text.middleStatTitle.text = '';
+				card.text.rightStatTitle.text = '';
+			}
+			
+		} else {
+			card.text.rules.text = langFontCode + rulesText;
+		}
+		
 		if (cardToImport.flavor_text) {
 			var flavorText = cardToImport.flavor_text;
 			var flavorTextCounter = 1;
@@ -1876,11 +4856,43 @@ function changeCardIndex() {
 				}
 				flavorTextCounter ++;
 			}
-			card.text.rules.text += '{flavor}' + curlyQuotes(flavorText.replace('\n', '{lns}'));
+
+			if (card.version == 'pokemon') {
+				if (cardToImport.type_line.toLowerCase().includes('creature')) {
+					card.text.rules.text += '{flavor}';
+					card.text.rules.text += curlyQuotes(flavorText.replace('\n', '{lns}'));
+				} else {
+					card.text.rules.text += '{flavor}';
+					card.text.rulesnoncreature.text += curlyQuotes(flavorText.replace('\n', '{lns}'));
+				}
+				
+			} else {
+				card.text.rules.text += '{flavor}';
+				card.text.rules.text += curlyQuotes(flavorText.replace('\n', '{lns}'));
+			}
+
+			
+		}
+	} else if (card.text.case) {
+		rulesText = rulesText.replace(/(\r\n|\r|\n)/g, '//{bar}//');
+		card.text.case.text = langFontCode + rulesText;
+	}
+
+	if (card.text.pt) {
+		if (card.version == 'invocation') {
+			card.text.pt.text = cardToImport.power + '\n' + cardToImport.toughness || '';
+		} else if (card.version == 'pokemon') {
+			card.text.middleStat.text = '{' + (cardToImport.power || '') + '}';
+			card.text.pt.text = '{' + (cardToImport.toughness || '') + '}';
+
+			if (card.text.middleStat && card.text.middleStat.text == '{}') {card.text.middleStat.text = '';}
+		} else {
+			card.text.pt.text = cardToImport.power + '/' + cardToImport.toughness || '';
 		}
 	}
-	if (card.text.pt) {card.text.pt.text = cardToImport.power + '/' + cardToImport.toughness || '';}
 	if (card.text.pt && card.text.pt.text == undefined + '/' + undefined) {card.text.pt.text = '';}
+	if (card.text.pt && card.text.pt.text == undefined + '\n' + undefined) {card.text.pt.text = '';}
+	if (card.text.pt && card.text.pt.text == '{}') {card.text.pt.text = '';}
 	if (card.version.includes('planeswalker')) {
 		card.text.loyalty.text = cardToImport.loyalty || '';
 		var planeswalkerAbilities = cardToImport.oracle_text.split('\n');
@@ -1895,7 +4907,7 @@ function changeCardIndex() {
 					planeswalkerAbility = ['', planeswalkerAbility[0]];
 				}
 				card.text['ability' + i].text = planeswalkerAbility[1].replace('(', '{i}(').replace(')', '){/i}');
-				if (card.version == 'planeswalkerTall') {
+				if (card.version == 'planeswalkerTall' || card.version == 'planeswalkerCompleated') {
 					document.querySelector('#planeswalker-height-' + i).value = Math.round(scaleHeight(0.3572) / planeswalkerAbilities.length);
 				} else {
 					document.querySelector('#planeswalker-height-' + i).value = Math.round(scaleHeight(0.2915) / planeswalkerAbilities.length);
@@ -1909,8 +4921,15 @@ function changeCardIndex() {
 		planeswalkerEdited();
 	} else if (card.version.includes('saga')) {
 		card.text.ability0.text = cardToImport.oracle_text.replace('(', '{i}(').replace(')', '){/i}') || '';
+	} else if (card.version.includes('battle')) {
+		card.text.defense.text = cardToImport.defense || '';
 	}
 	document.querySelector('#text-editor').value = card.text[Object.keys(card.text)[selectedTextIndex]].text;
+	document.querySelector('#text-editor-font-size').value = 0;
+	//font size
+	Object.keys(card.text).forEach(key => {
+			card.text[key].fontSize = 0;
+		});
 	textEdited();
 	//collector's info
 	if (localStorage.getItem('enableImportCollectorInfo') == 'true') {
@@ -1922,8 +4941,35 @@ function changeCardIndex() {
 		setXhttp.onreadystatechange = function() {
 			if (this.readyState == 4 && this.status == 200) {
 				var setObject = JSON.parse(this.responseText)
-				if (setObject.printed_size) {
-					document.querySelector('#info-number').value += "/" + setObject.printed_size;
+				if (document.querySelector('#enableNewCollectorStyle').checked) {
+					var number = document.querySelector('#info-number').value;
+
+					while (number.length < 4) {
+						number = '0' + number;
+					}
+
+					document.querySelector('#info-number').value = number;
+
+					bottomInfoEdited();
+				} else if (setObject.printed_size) {
+					var number = document.querySelector('#info-number').value;
+
+					while (number.length < 3) {
+						number = '0' + number;
+					}
+
+					var printedSize = setObject.printed_size;
+					while (printedSize.length < 3) {
+						printedSize = '0' + printedSize;
+					}
+
+					if (parseInt(number) <= parseInt(printedSize)) {
+						document.querySelector('#info-number').value = number + "/" + printedSize;
+					} else {
+						document.querySelector('#info-number').value = number;
+					}
+
+					
 					bottomInfoEdited();
 				}
 			}
@@ -1937,7 +4983,11 @@ function changeCardIndex() {
 	}
 	//art
 	document.querySelector('#art-name').value = cardToImport.name;
-	fetchScryfallData(cardToImport.name, artFromScryfall, true);
+	fetchScryfallData(cardToImport.name, artFromScryfall, 'art');
+	if (document.querySelector('#importAllPrints').checked) {
+		// document.querySelector('#art-index').value = document.querySelector('#import-index').value;
+		// changeArtIndex();
+	}
 	//set symbol
 	if (!document.querySelector('#lockSetSymbolCode').checked) {
 		document.querySelector('#set-symbol-code').value = cardToImport.set;
@@ -1959,6 +5009,10 @@ function loadAvailableCards(cardKeys = JSON.parse(localStorage.getItem('cardKeys
 		cardKeyOption.innerHTML = item;
 		document.querySelector('#load-card-options').appendChild(cardKeyOption);
 	});
+}
+function importChanged() {
+	var unique = document.querySelector('#importAllPrints').checked ? 'prints' : '';
+	fetchScryfallData(document.querySelector("#import-name").value, importCard, unique);
 }
 function saveCard(saveFromFile) {
 	var cardKeys = JSON.parse(localStorage.getItem('cardKeys')) || [];
@@ -2017,9 +5071,11 @@ async function loadCard(selectedCardKey) {
 		document.querySelector('#info-rarity').value = card.infoRarity;
 		document.querySelector('#info-set').value = card.infoSet;
 		document.querySelector('#info-language').value = card.infoLanguage;
+		document.querySelector('#info-note').value = card.infoNote;
 		document.querySelector('#info-year').value = card.infoYear || date.getFullYear();
 		artistEdited(card.infoArtist);
 		document.querySelector('#text-editor').value = card.text[Object.keys(card.text)[selectedTextIndex]].text;
+		document.querySelector('#text-editor-font-size').value = card.text[Object.keys(card.text)[selectedTextIndex]].fontSize || 0;
 		loadTextOptions(card.text);
 		document.querySelector('#art-x').value = scaleX(card.artX) - scaleWidth(card.marginX);
 		document.querySelector('#art-y').value = scaleY(card.artY) - scaleHeight(card.marginY);
@@ -2038,6 +5094,13 @@ async function loadCard(selectedCardKey) {
 		document.querySelector('#watermark-opacity').value = card.watermarkOpacity * 100;
 		document.getElementById("rounded-corners").checked = !card.noCorners;
 		uploadWatermark(card.watermarkSource);
+		document.querySelector('#serial-number').value = card.serialNumber;
+		document.querySelector('#serial-total').value = card.serialTotal;
+		document.querySelector('#serial-x').value = card.serialX;
+		document.querySelector('#serial-y').value = card.serialY;
+		document.querySelector('#serial-scale').value = card.serialScale;
+		serialInfoEdited();
+
 		card.frames.reverse();
 		await card.frames.forEach(item => addFrame([], item));
 		card.frames.reverse();
@@ -2196,7 +5259,7 @@ function imageURL(url, destination, otherParams) {
 	} else if (params.get('noproxy') != '') {
 		//CORS PROXY LINKS
 		//Previously: https://cors.bridged.cc/
-		imageurl = 'https://api.codetabs.com/v1/proxy?quest=' + url;
+		imageurl = 'https://corsproxy.io/?' + encodeURIComponent(url);
 	}
 	destination(imageurl, otherParams);
 }
@@ -2264,52 +5327,141 @@ function stretchSVGReal(data, frameObject) {
 	});
 	return returnData;
 }
-//SCRYFALL STUFF MAY BE CHANGED IN THE FUTURE
-function fetchScryfallData(cardName, callback = console.log, searchUniqueArt = '') {
+function processScryfallCard(card, responseCards) {
+	if ('card_faces' in card) {
+		card.card_faces.forEach(face => {
+			face.set = card.set;
+			face.rarity = card.rarity;
+			face.collector_number = card.collector_number;
+			face.lang = card.lang;
+			if (card.lang != 'en') {
+				face.oracle_text = face.printed_text;
+				face.name = face.printed_name;
+				face.type_line = face.printed_type_line;
+			}
+			responseCards.push(face);
+			if (!face.image_uris) {
+				face.image_uris = card.image_uris;
+			}
+		});
+	} else {
+		if (card.lang != 'en') {
+			card.oracle_text = card.printed_text;
+			card.name = card.printed_name;
+			card.type_line = card.printed_type_line;
+		}
+		responseCards.push(card);
+	}
+}
+
+function fetchScryfallCardByID(scryfallID, callback = console.log) {
 	var xhttp = new XMLHttpRequest();
 	xhttp.onreadystatechange = function() {
 		if (this.readyState == 4 && this.status == 200) {
 			responseCards = [];
-			importedCards = JSON.parse(this.responseText).data;
+			importedCards = [JSON.parse(this.responseText)];
 			importedCards.forEach(card => {
-				if ('card_faces' in card) {
-					card.card_faces.forEach(face => {
-						face.set = card.set;
-						face.rarity = card.rarity;
-						if (card.lang != 'en') {
-							face.oracle_text = face.printed_text;
-							face.name = face.printed_name;
-							face.type_line = face.printed_type_line;
-						}
-						responseCards.push(face);
-					});
-				} else {
-					if (card.lang != 'en') {
-						card.oracle_text = card.printed_text;
-						card.name = card.printed_name;
-						card.type_line = card.printed_type_line;
-					}
-					responseCards.push(card);
-				}
+				processScryfallCard(card, responseCards);
 			});
 			callback(responseCards);
-		} else if (this.readyState == 4 && this.status == 404 && !searchUniqueArt && cardName != '') {
-			notify(`No cards found for "${cardName}" in ${cardLanguageSelect.options[cardLanguageSelect.selectedIndex].text}.`, 5);
+		} else if (this.readyState == 4 && this.status == 404 && !unique && cardName != '') {
+			notify(`No card found for "${cardName}" in ${cardLanguageSelect.options[cardLanguageSelect.selectedIndex].text}.`, 5);
 		}
 	}
-	cardLanguageSelect = document.querySelector('#import-language');
-	var cardLanguage = `lang%3D${cardLanguageSelect.value}`;
-	var uniqueArt = '';
-	if (searchUniqueArt) {
-		uniqueArt = '&unique=art';
-	}
-	xhttp.open('GET', `https://api.scryfall.com/cards/search?order=released&include_extras=true${uniqueArt}&q=name%3D${cardName.replace(/ /g, '_')}%20${cardLanguage}`, true);
+	xhttp.open('GET', 'https://api.scryfall.com/cards/' + scryfallID, true);
 	try {
 		xhttp.send();
 	} catch {
 		console.log('Scryfall API search failed.')
 	}
 }
+
+function fetchScryfallCardByCodeNumber(code, number, callback = console.log) {
+	var xhttp = new XMLHttpRequest();
+	xhttp.onreadystatechange = function() {
+		if (this.readyState == 4 && this.status == 200) {
+			responseCards = [];
+			importedCards = [JSON.parse(this.responseText)];
+			importedCards.forEach(card => {
+				processScryfallCard(card, responseCards);
+			});
+			callback(responseCards);
+		} else if (this.readyState == 4 && this.status == 404 && !unique && cardName != '') {
+			notify('No card found for ' + code + ' #' + number, 5);
+		}
+	}
+	xhttp.open('GET', 'https://api.scryfall.com/cards/' + code + '/' + number, true);
+	try {
+		xhttp.send();
+	} catch {
+		console.log('Scryfall API search failed.')
+	}
+}
+
+//SCRYFALL STUFF MAY BE CHANGED IN THE FUTURE
+function fetchScryfallData(cardName, callback = console.log, unique = '') {
+	var xhttp = new XMLHttpRequest();
+	xhttp.onreadystatechange = function() {
+		if (this.readyState == 4 && this.status == 200) {
+			responseCards = [];
+			importedCards = JSON.parse(this.responseText).data;
+			importedCards.forEach(card => {
+				processScryfallCard(card, responseCards);
+			});
+			callback(responseCards);
+		} else if (this.readyState == 4 && this.status == 404 && !unique && cardName != '') {
+			notify(`No cards found for "${cardName}" in ${cardLanguageSelect.options[cardLanguageSelect.selectedIndex].text}.`, 5);
+		}
+	}
+	cardLanguageSelect = document.querySelector('#import-language');
+	var cardLanguage = `lang%3D${cardLanguageSelect.value}`;
+	var uniqueArt = '';
+	if (unique) {
+		uniqueArt = '&unique=' + unique;
+	}
+	var url = `https://api.scryfall.com/cards/search?order=released&include_extras=true${uniqueArt}&q=name%3D${cardName.replace(/ /g, '_')}%20${cardLanguage}`;
+	xhttp.open('GET', url, true);
+	try {
+		xhttp.send();
+	} catch {
+		console.log('Scryfall API search failed.')
+	}
+}
+
+function toggleTextTag(tag) {
+	var element = document.getElementById('text-editor');
+
+	var text = element.value;
+
+	var start = element.selectionStart;
+	var end = element.selectionEnd;
+	var selection = text.substring(start, end);
+
+	var openTag = '{' + tag + '}';
+	var closeTag = '{/' + tag + '}';
+
+	var prefix = text.substring(0, start);
+	var suffix = text.substring(end);
+
+	if (prefix.endsWith(openTag) && suffix.startsWith(closeTag)) {
+		prefix = prefix.substring(0, prefix.length-openTag.length);
+		suffix = suffix.substring(closeTag.length);
+	} else if (selection.startsWith(openTag) && selection.endsWith(closeTag)) {
+		selection = selection.substring(openTag.length, selection.length-closeTag.length);
+	} else {
+		selection = openTag + selection + closeTag;
+	}
+
+	element.value = prefix + selection + suffix;
+
+	textEdited();
+}
+
+function toggleHighRes() {
+	localStorage.setItem('high-res', document.querySelector('#high-res').checked);
+	drawCard();
+}
+
 // INITIALIZATION
 
 // auto load frame version (user defaults)
@@ -2317,11 +5469,13 @@ if (!localStorage.getItem('autoLoadFrameVersion')) {
 	localStorage.setItem('autoLoadFrameVersion', document.querySelector('#autoLoadFrameVersion').checked);
 }
 document.querySelector('#autoLoadFrameVersion').checked = 'true' == localStorage.getItem('autoLoadFrameVersion');
+// document.querySelector('#high-res').checked = 'true' == localStorage.getItem('high-res');
 
 // collector info (user defaults)
 var defaultCollector = JSON.parse(localStorage.getItem('defaultCollector') || '{}');
 if ('number' in defaultCollector) {
 	document.querySelector('#info-number').value = defaultCollector.number;
+	document.querySelector('#info-note').value = defaultCollector.note;
 	document.querySelector('#info-rarity').value = defaultCollector.rarity;
 	document.querySelector('#info-set').value = defaultCollector.setCode;
 	document.querySelector('#info-language').value = defaultCollector.lang;
@@ -2334,10 +5488,33 @@ if (!localStorage.getItem('enableImportCollectorInfo')) {
 } else {
 	document.querySelector('#enableImportCollectorInfo').checked = (localStorage.getItem('enableImportCollectorInfo') == 'true');
 }
+if (!localStorage.getItem('enableNewCollectorStyle')) {
+	localStorage.setItem('enableNewCollectorStyle', 'false');
+} else {
+	document.querySelector('#enableNewCollectorStyle').checked = (localStorage.getItem('enableNewCollectorStyle') == 'true');
+}
+if (!localStorage.getItem('enableCollectorInfo')) {
+	localStorage.setItem('enableCollectorInfo', 'true');
+} else {
+	document.querySelector('#enableCollectorInfo').checked = (localStorage.getItem('enableCollectorInfo') == 'true');
+}
+if (!localStorage.getItem('autoFrame')) {
+	localStorage.setItem('autoFrame', 'false');
+} else {
+	document.querySelector('#autoFrame').value = localStorage.getItem('autoFrame');
+}
+if (!localStorage.getItem('autoFit')) {
+	localStorage.setItem('autoFit', 'true');
+} else {
+	document.querySelector('#art-update-autofit').checked = localStorage.getItem('autoFit');
+}
 
 // lock set symbol code (user defaults)
 if (!localStorage.getItem('lockSetSymbolCode')) {
 	localStorage.setItem('lockSetSymbolCode', '');
+}
+if (localStorage.getItem('set-symbol-source')) {
+	document.querySelector('#set-symbol-source').value = localStorage.getItem('set-symbol-source');
 }
 document.querySelector('#lockSetSymbolCode').checked = '' != localStorage.getItem('lockSetSymbolCode');
 if (document.querySelector('#lockSetSymbolCode').checked) {

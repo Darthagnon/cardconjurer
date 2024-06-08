@@ -1,9 +1,15 @@
 loadFramePacks([
 	{name:'Generic Margins', value:'Margin-1'},
+	{name:'Breaking News Margin', value:'MarginBreakingNews'},
+	{name:'Vault Margin', value:'MarginVault'},
+	{name:'Wanted Poster Margin', value:'MarginWanted'},
+	{name:'Enchanting Tales Margins', value:'MarginEnchantingTales'},
+	{name:'LTR Ring Margins', value:'MarginRing'},
 	{name:'D&D Module Margins', value:'MarginDNDModule'},
 	{name:'Mystical Archive Margins', value:'MarginMysticalArchive'},
 	{name:'Unstable Basics Margins', value:'MarginUnstable'},
 	{name:'Invocation Margins', value:'MarginInvocation'},
+	{name:'Accurate Frame Margins', value:'MarginNew'},
 	{name:'Custom Margins', value:'disabled'},
 	{name:'Celid\'s Asap Margins', value:'CustomMarginCelidAsap'}
 ])
@@ -11,7 +17,7 @@ loadFramePacks([
 //For multiple Margin packs
 var loadMarginVersion = async () => {
 	//resets things so that every frame doesn't have to
-	await resetCardIrregularities({canvas:[1500, 2100, 0.044, 1/35], resetOthers:false});
+	await resetCardIrregularities({canvas:[getStandardWidth(), getStandardHeight(), 0.044, 1/35], resetOthers:false});
 	//sets card version
 	// card.version = 'margin';
 	card.margins = true;

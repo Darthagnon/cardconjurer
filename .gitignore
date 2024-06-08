@@ -1,6 +1,7 @@
 debug.log
 CORS.json
 *.bat
+*.bak
 dev/*
 
 # dependencies
@@ -29,3 +30,5 @@ yarn-debug.log*
 cardconjurer.iml
 access.log
 error.log
+
+fly.toml

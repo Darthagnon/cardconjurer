@@ -30,6 +30,7 @@ availableFrames = [
 	{name:'White Border', src:'/img/frames/white.png', masks:borderMask, noDefaultMask:true},
 	{name:'Silver Border', src:'/img/frames/silver.png', masks:borderMask, noDefaultMask:true},
 	{name:'Gold Border', src:'/img/frames/gold.png', masks:borderMask, noDefaultMask:true},
+	{name:'Colorless Frame (Alt)', src:'/img/frames/seventh/regular/cAlt.png', masks:masks},
 	{name:'The Dark Land Frame', src:'/img/frames/seventh/regular/lTheDark.png', masks:masks},
 	{name:'Alliances Land Frame', src:'/img/frames/seventh/regular/lAlliances.png', masks:masks},
 	{name:'Mirage Land Frame', src:'/img/frames/seventh/regular/lMirage.png', masks:masks},
@@ -47,6 +48,7 @@ document.querySelector('#loadFrameVersion').onclick = async function() {
 	await resetCardIrregularities();
 	//sets card version
 	card.version = 'fifth';
+	card.showsFlavorBar = false;
 	//art bounds
 	card.artBounds = {x:0.12, y:0.0991, width:0.7667, height:0.4429};
 	autoFitArt();

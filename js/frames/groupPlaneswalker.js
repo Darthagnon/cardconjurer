@@ -4,6 +4,9 @@ loadFramePacks([
 	{name:'Extended Art', value:'PlaneswalkerBoxTopper'},
 	{name:'Tall', value:'PlaneswalkerTall'},
 	{name:'Tall Borderless', value:'PlaneswalkerTallBorderless'},
+	{name:'Compleated', value:'PlaneswalkerCompleated'},
+	{name:'Innistrad: Double Feature', value:'PlaneswalkerDBL'},
+	{name:'Innistrad: Double Feature (Tall)', value:'PlaneswalkerTallDBL'},
 	{name:'Addons', value:'disabled'},
 	{name:'Holo Stamps', value:'PlaneswalkerHoloStamps'},
 	{name:'Special Frames', value:'disabled'},
@@ -13,6 +16,8 @@ loadFramePacks([
 	{name:'MDFC', value:'PlaneswalkerMDFC'},
 	{name:'Transform (Front)', value:'PlaneswalkerTransformFront'},
 	{name:'Transform (Back)', value:'PlaneswalkerTransformBack'},
+	{name:'Innistrad: Double Feature: Transform (Front)', value:'PlaneswalkerTransformFrontDBL'},
+	{name:'Innistrad: Double Feature: Transform (Back)', value:'PlaneswalkerTransformBackDBL'},
 	{name:'Color Identity Pips', value:'M15CIPips'},
 	{name:'Transform Icons', value:'PlaneswalkerTransformIcons'}
 ])
